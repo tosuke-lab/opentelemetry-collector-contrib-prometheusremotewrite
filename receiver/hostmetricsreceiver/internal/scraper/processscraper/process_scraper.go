@@ -211,7 +211,7 @@ func scrapeAndAppendMemoryUsageMetrics(metrics pdata.MetricSlice, now pdata.Time
 
 func initializeMemoryUsageMetric(metric pdata.Metric, metricIntf metadata.MetricIntf, now pdata.Timestamp, usage int64) {
 	metricIntf.Init(metric)
-	initializeMemoryUsageDataPoint(metric.Sum().DataPoints().AppendEmpty(), now, usage)
+	initializeMemoryUsageDataPoint(metric.Gauge().DataPoints().AppendEmpty(), now, usage)
 }
 
 func initializeMemoryUsageDataPoint(dataPoint pdata.NumberDataPoint, now pdata.Timestamp, usage int64) {

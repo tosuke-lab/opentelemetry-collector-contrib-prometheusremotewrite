@@ -16,7 +16,6 @@ package resourcetotelemetry // import "github.com/open-telemetry/opentelemetry-c
 
 import (
 	"context"
-
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/consumer"
 	"go.opentelemetry.io/collector/model/pdata"
@@ -30,15 +29,17 @@ import (
 // }
 type Settings struct {
 	// Enabled indicates whether to convert resource attributes to telemetry attributes. Default is `false`.
-	Enabled bool `mapstructure:"enabled"`
+	Enabled           bool     `mapstructure:"enabled"`
+	ExcludeAttributes []string `mapstructure:"exclude_attributes"`
 }
 
 type wrapperMetricsExporter struct {
 	component.MetricsExporter
+	ExcludeAttributes map[string]bool
 }
 
 func (wme *wrapperMetricsExporter) ConsumeMetrics(ctx context.Context, md pdata.Metrics) error {
-	return wme.MetricsExporter.ConsumeMetrics(ctx, convertToMetricsAttributes(md))
+	return wme.MetricsExporter.ConsumeMetrics(ctx, convertToMetricsAttributes(md, wme.ExcludeAttributes))
 }
 
 func (wme *wrapperMetricsExporter) Capabilities() consumer.Capabilities {
@@ -52,14 +53,16 @@ func WrapMetricsExporter(set Settings, exporter component.MetricsExporter) compo
 	if !set.Enabled {
 		return exporter
 	}
-	return &wrapperMetricsExporter{MetricsExporter: exporter}
+	return &wrapperMetricsExporter{MetricsExporter: exporter, ExcludeAttributes: sliceToStringSet(set.ExcludeAttributes)}
 }
 
-func convertToMetricsAttributes(md pdata.Metrics) pdata.Metrics {
+func convertToMetricsAttributes(md pdata.Metrics, excludeAttributes map[string]bool) pdata.Metrics {
 	cloneMd := md.Clone()
 	rms := cloneMd.ResourceMetrics()
 	for i := 0; i < rms.Len(); i++ {
 		resource := rms.At(i).Resource()
+
+		labelMap := extractLabelsFromResource(&resource, excludeAttributes)
 
 		ilms := rms.At(i).InstrumentationLibraryMetrics()
 		for j := 0; j < ilms.Len(); j++ {
@@ -67,11 +70,30 @@ func convertToMetricsAttributes(md pdata.Metrics) pdata.Metrics {
 			metricSlice := ilm.Metrics()
 			for k := 0; k < metricSlice.Len(); k++ {
 				metric := metricSlice.At(k)
-				addAttributesToMetric(&metric, resource.Attributes())
+				addAttributesToMetric(&metric, labelMap)
 			}
 		}
 	}
 	return cloneMd
+}
+
+// extractAttributesFromResource extracts the attributes from a given resource and
+// returns them as a StringMap.
+func extractLabelsFromResource(resource *pdata.Resource, excludeAttributes map[string]bool) pdata.AttributeMap {
+	if len(excludeAttributes) == 0 {
+		return resource.Attributes()
+	}
+	labelMap := pdata.NewAttributeMap()
+	attributes := resource.Attributes()
+	attrMap := attributes.AsRaw()
+	for k := range attrMap {
+		shouldBeSkipped := excludeAttributes[k]
+		if !shouldBeSkipped {
+			stringLabel, _ := attributes.Get(k)
+			labelMap.Upsert(k, stringLabel)
+		}
+	}
+	return labelMap
 }
 
 // addAttributesToMetric adds additional labels to the given metric
@@ -119,4 +141,14 @@ func joinAttributeMaps(from, to pdata.AttributeMap) {
 		to.Upsert(k, v)
 		return true
 	})
+}
+
+// sliceToSet converts slice of strings to set of strings
+// Returns the set of strings
+func sliceToStringSet(slice []string) map[string]bool {
+	set := make(map[string]bool, len(slice))
+	for _, s := range slice {
+		set[s] = true
+	}
+	return set
 }

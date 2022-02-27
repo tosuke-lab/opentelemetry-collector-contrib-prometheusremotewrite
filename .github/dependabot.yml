@@ -314,6 +314,10 @@ updates:
     schedule:
       interval: "weekly"
   - package-ecosystem: "gomod"
+    directory: "/internal/containertest"
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: "gomod"
     directory: "/internal/coreinternal"
     schedule:
       interval: "weekly"
@@ -599,6 +603,10 @@ updates:
       interval: "weekly"
   - package-ecosystem: "gomod"
     directory: "/receiver/prometheusreceiver"
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: "gomod"
+    directory: "/receiver/prometheusremotewritereceiver"
     schedule:
       interval: "weekly"
   - package-ecosystem: "gomod"

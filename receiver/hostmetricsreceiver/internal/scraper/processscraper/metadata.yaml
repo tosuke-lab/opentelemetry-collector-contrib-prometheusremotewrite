@@ -23,7 +23,7 @@ metrics:
   process.memory.physical_usage:
     enabled: true
     description: The amount of physical memory in use.
-    unit: By
+    unit: B
     sum:
       value_type: int
       aggregation: cumulative
@@ -32,7 +32,7 @@ metrics:
   process.memory.virtual_usage:
     enabled: true
     description: Virtual memory size.
-    unit: By
+    unit: B
     sum:
       value_type: int
       aggregation: cumulative
