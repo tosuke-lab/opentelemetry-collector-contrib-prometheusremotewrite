@@ -9,6 +9,7 @@ import (
 	"go.opentelemetry.io/collector/config"
 	"go.opentelemetry.io/collector/config/confighttp"
 	"go.opentelemetry.io/collector/consumer/consumertest"
+	"go.opentelemetry.io/collector/model/pdata"
 	"net/http"
 	"testing"
 )
@@ -42,16 +43,48 @@ func TestPrometheusRemoteWriteReceiver(t *testing.T) {
 			Labels: []Label{
 				{
 					Name:  "__name__",
-					Value: "foo_bar",
+					Value: "http_server_requests_seconds_sum",
 				},
 				{
-					Name:  "biz",
-					Value: "baz",
+					Name:  "method",
+					Value: "GET",
 				},
 			},
 			Datapoint: Datapoint{
 				Timestamp: now,
-				Value:     1415.92,
+				Value:     1.0,
+			},
+		},
+		{
+			Labels: []Label{
+				{
+					Name:  "__name__",
+					Value: "http_server_requests_seconds_count",
+				},
+				{
+					Name:  "method",
+					Value: "GET",
+				},
+			},
+			Datapoint: Datapoint{
+				Timestamp: now,
+				Value:     2.0,
+			},
+		},
+		{
+			Labels: []Label{
+				{
+					Name:  "__name__",
+					Value: "pdc_jvm_memory_used_bytes",
+				},
+				{
+					Name:  "xxx",
+					Value: "yyy",
+				},
+			},
+			Datapoint: Datapoint{
+				Timestamp: now,
+				Value:     0.0,
 			},
 		},
 	}
@@ -59,4 +92,14 @@ func TestPrometheusRemoteWriteReceiver(t *testing.T) {
 	r, writeErr := c.WriteTimeSeries(context.Background(), tsList, WriteOptions{})
 	require.Nil(t, writeErr)
 	require.Equal(t, http.StatusAccepted, r.StatusCode)
+
+	require.Equal(t, pdata.MetricDataTypeSum, cms.AllMetrics()[0].ResourceMetrics().At(0).InstrumentationLibraryMetrics().At(0).Metrics().At(0).DataType())
+	require.Equal(t, true, cms.AllMetrics()[0].ResourceMetrics().At(0).InstrumentationLibraryMetrics().At(0).Metrics().At(0).Sum().IsMonotonic())
+	require.Equal(t, pdata.MetricAggregationTemporalityCumulative, cms.AllMetrics()[0].ResourceMetrics().At(0).InstrumentationLibraryMetrics().At(0).Metrics().At(0).Sum().AggregationTemporality())
+
+	require.Equal(t, pdata.MetricDataTypeSum, cms.AllMetrics()[0].ResourceMetrics().At(1).InstrumentationLibraryMetrics().At(0).Metrics().At(0).DataType())
+	require.Equal(t, true, cms.AllMetrics()[0].ResourceMetrics().At(1).InstrumentationLibraryMetrics().At(0).Metrics().At(0).Sum().IsMonotonic())
+	require.Equal(t, pdata.MetricAggregationTemporalityCumulative, cms.AllMetrics()[0].ResourceMetrics().At(1).InstrumentationLibraryMetrics().At(0).Metrics().At(0).Sum().AggregationTemporality())
+
+	require.Equal(t, pdata.MetricDataTypeGauge, cms.AllMetrics()[0].ResourceMetrics().At(2).InstrumentationLibraryMetrics().At(0).Metrics().At(0).DataType())
 }
