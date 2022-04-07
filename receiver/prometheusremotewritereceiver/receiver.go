@@ -24,8 +24,7 @@ import (
 )
 
 const (
-	receiverTransport = "http"
-	receiverFormat    = "protobuf"
+	receiverFormat = "protobuf"
 )
 
 // Receiver - remote write
@@ -136,8 +135,10 @@ func (rec *PrometheusRemoteWriteReceiver) ServeHTTP(w http.ResponseWriter, r *ht
 			for _, l := range ts.Labels {
 				ppoint.Attributes().Insert(l.Name, pdata.NewAttributeValueString(l.Value))
 			}
-			if metricsType == "sum" {
+			if IsValidCumulativeSuffix(metricsType) {
 				pm.SetDataType(pdata.MetricDataTypeSum)
+				pm.Sum().SetIsMonotonic(true)
+				pm.Sum().SetAggregationTemporality(pdata.MetricAggregationTemporalityCumulative)
 				ppoint.CopyTo(pm.Sum().DataPoints().AppendEmpty())
 			} else {
 				pm.SetDataType(pdata.MetricDataTypeGauge)
@@ -190,6 +191,18 @@ func IsValidSuffix(suffix string) bool {
 	switch suffix {
 	case
 		"max",
+		"sum",
+		"count",
+		"total":
+		return true
+	}
+	return false
+}
+
+// IsValidCumulativeSuffix - remote write
+func IsValidCumulativeSuffix(suffix string) bool {
+	switch suffix {
+	case
 		"sum",
 		"count",
 		"total":
