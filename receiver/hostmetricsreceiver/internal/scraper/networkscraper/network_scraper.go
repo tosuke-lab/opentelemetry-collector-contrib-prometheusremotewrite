@@ -17,9 +17,9 @@ package networkscraper // import "github.com/open-telemetry/opentelemetry-collec
 import (
 	"context"
 	"fmt"
+	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver/internal"
 	"time"
 
-	"github.com/shirou/gopsutil/v3/host"
 	"github.com/shirou/gopsutil/v3/net"
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/pdata/pcommon"
@@ -51,7 +51,7 @@ type scraper struct {
 
 // newNetworkScraper creates a set of Network related metrics
 func newNetworkScraper(_ context.Context, cfg *Config) (*scraper, error) {
-	scraper := &scraper{config: cfg, bootTime: host.BootTime, ioCounters: net.IOCounters, connections: net.Connections}
+	scraper := &scraper{config: cfg, bootTime: internal.CurrentTime, ioCounters: net.IOCounters, connections: net.Connections}
 
 	var err error
 

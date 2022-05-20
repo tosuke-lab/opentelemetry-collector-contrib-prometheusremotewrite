@@ -125,6 +125,11 @@ The following configuration options are supported:
 
 - `project` (optional): GCP project identifier.
 - `user_agent` (optional): Override the user agent string sent on requests to Cloud Monitoring (currently only applies to metrics). Specify `{{version}}` to include the application version number. Defaults to `opentelemetry-collector-contrib {{version}}`.
+- `use_insecure` (optional): If true. use gRPC as their communication transport. Only has effect if Endpoint is not "".
+- `credential_file_name` (optional): Path to service account token.
+- `timeout` (optional): Timeout for all API calls. If not set, defaults to 12 seconds.
+- `resource_mappings` (optional): ResourceMapping defines mapping of resources from source (OpenCensus) to target (Google Cloud).
+  - `label_mappings` (optional): Optional flag signals whether we can proceed with transformation if a label is missing in the resource.
 - `retry_on_failure` (optional): Configuration for how to handle retries when sending data to Google Cloud fails.
   - `enabled` (default = true)
   - `initial_interval` (default = 5s): Time to wait after the first failure before retrying; ignored if `enabled` is `false`

@@ -20,6 +20,12 @@ package googlecloudexporter // import "github.com/open-telemetry/opentelemetry-c
 import (
 	"context"
 	"fmt"
+	resourcepb "github.com/census-instrumentation/opencensus-proto/gen-go/resource/v1"
+	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/resourcetotelemetry"
+	"go.opentelemetry.io/collector/config/configtelemetry"
+	"go.opentelemetry.io/collector/obsreport"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"strings"
 	"sync"
 
@@ -41,7 +47,12 @@ import (
 
 // metricsExporter is a wrapper struct of OC stackdriver exporter
 type metricsExporter struct {
-	mexporter *stackdriver.Exporter
+	mexporter                  *stackdriver.Exporter
+	labelsLimit                int
+	LabelsToResources          []LabelsToResource
+	loggerNoStacktrace         *zap.Logger
+	obsrep                     *obsreport.Processor
+	resourceToTelemetrySetting *resourcetotelemetry.Settings
 }
 
 func (me *metricsExporter) Shutdown(context.Context) error {
@@ -79,6 +90,9 @@ func generateClientOptions(cfg *LegacyConfig) ([]option.ClientOption, error) {
 	}
 	if cfg.GetClientOptions != nil {
 		copts = append(copts, cfg.GetClientOptions()...)
+	}
+	if cfg.CredentialFileName != "" {
+		copts = append(copts, option.WithCredentialsFile(cfg.CredentialFileName))
 	}
 	return copts, nil
 }
@@ -130,13 +144,26 @@ func newLegacyGoogleCloudMetricsExporter(cfg *LegacyConfig, set component.Export
 		options.MapResource = rm.mapResource
 	}
 
+	obsrep := obsreport.NewProcessor(obsreport.ProcessorSettings{
+		Level:                   configtelemetry.LevelDetailed,
+		ProcessorID:             cfg.ID(),
+		ProcessorCreateSettings: component.ProcessorCreateSettings{},
+	})
+
 	sde, serr := stackdriver.NewExporter(options)
 	if serr != nil {
 		return nil, fmt.Errorf("cannot configure Google Cloud metric exporter: %w", serr)
 	}
-	mExp := &metricsExporter{mexporter: sde}
 
-	return exporterhelper.NewMetricsExporter(
+	mExp := &metricsExporter{
+		mexporter:                  sde,
+		labelsLimit:                cfg.LabelsLimit,
+		LabelsToResources:          cfg.LabelsToResources,
+		loggerNoStacktrace:         set.Logger.WithOptions(zap.AddStacktrace(zapcore.PanicLevel)),
+		obsrep:                     obsrep,
+		resourceToTelemetrySetting: &cfg.ResourceToTelemetrySettings}
+
+	exporter, err := exporterhelper.NewMetricsExporter(
 		cfg,
 		set,
 		mExp.pushMetrics,
@@ -146,6 +173,11 @@ func newLegacyGoogleCloudMetricsExporter(cfg *LegacyConfig, set component.Export
 		exporterhelper.WithTimeout(exporterhelper.TimeoutSettings{Timeout: 0}),
 		exporterhelper.WithQueue(cfg.QueueSettings),
 		exporterhelper.WithRetry(cfg.RetrySettings))
+	if err != nil {
+		return nil, fmt.Errorf("cannot configure new Google Cloud metric exporter: %w", serr)
+	}
+	return resourcetotelemetry.WrapMetricsExporter(cfg.ResourceToTelemetrySettings, exporter), nil
+
 }
 
 // pushMetrics calls StackdriverExporter.PushMetricsProto on each element of the given metrics
@@ -162,17 +194,43 @@ func (me *metricsExporter) pushMetrics(ctx context.Context, m pmetric.Metrics) e
 	mds = exportAdditionalLabels(mds)
 
 	count := 0
-	for _, md := range mds {
-		count += len(md.Metrics)
+	for i := 0; i < len(mds); i++ {
+		if len(me.LabelsToResources) > 0 {
+			me.mapLabelsToResource(mds[i])
+		}
+		if me.labelsLimit > 0 { // drop metrics with labels count greater then labelsLimit
+			for _, metric := range mds[i].Metrics {
+				if len(metric.GetMetricDescriptor().GetLabelKeys()) <= me.labelsLimit {
+					count++
+				} else {
+					me.loggerNoStacktrace.Warn("Dropping metric: too many labels",
+						zap.String("metric", metric.GetMetricDescriptor().GetName()),
+						zap.Int("labels", len(metric.GetMetricDescriptor().GetLabelKeys())),
+						zap.Int("limit", me.labelsLimit))
+				}
+			}
+		} else {
+			count += len(mds[i].Metrics)
+		}
+	}
+	if count == 0 {
+		me.loggerNoStacktrace.Warn("Dropping sending whole batch: no metrics, because all dropped, reason: too many labels",
+			zap.Int("limit", me.labelsLimit))
+		return nil
 	}
 	metrics := make([]*metricspb.Metric, 0, count)
 	for _, md := range mds {
-		if md.Resource == nil {
+		if md.Resource == nil && me.labelsLimit == 0 {
 			metrics = append(metrics, md.Metrics...)
 			continue
 		}
 		for _, metric := range md.Metrics {
-			if metric.Resource == nil {
+			if me.labelsLimit > 0 && len(metric.GetMetricDescriptor().GetLabelKeys()) > me.labelsLimit {
+				// drop metrics with labels count greater then labelsLimit
+				me.obsrep.MetricsRefused(ctx, len(metric.Timeseries))
+				continue
+			}
+			if metric.Resource == nil && md.Resource != nil {
 				metric.Resource = md.Resource
 			}
 			metrics = append(metrics, metric)
@@ -184,6 +242,80 @@ func (me *metricsExporter) pushMetrics(ctx context.Context, m pmetric.Metrics) e
 	dropped, err := me.mexporter.PushMetricsProto(ctx, nil, nil, metrics)
 	recordPointCount(ctx, points-dropped, dropped, err)
 	return err
+}
+
+func (me *metricsExporter) mapLabelsToResource(md *agentmetricspb.ExportMetricsServiceRequest) {
+	metrics := make([]*metricspb.Metric, 0, len(md.Metrics))
+	for _, metric := range md.Metrics {
+
+		if metric.Resource == nil && md.Resource != nil {
+			metric.Resource = md.Resource
+		}
+		found := false
+		for _, ltr := range me.LabelsToResources {
+			if me.labelsLimit == 0 || me.labelsLimit >= len(metric.GetMetricDescriptor().GetLabelKeys())-len(ltr.LabelToResources) {
+				for _, labelKey := range metric.MetricDescriptor.LabelKeys {
+					if labelKey.Key == ltr.RequiredLabel {
+						labelKeys := append([]*metricspb.LabelKey(nil), metric.MetricDescriptor.LabelKeys...)
+
+						indices := make([]int, 0, len(ltr.LabelToResources))
+						for _, mapping := range ltr.LabelToResources {
+							for i := 0; i < len(labelKeys); i++ {
+								if labelKeys[i].Key == mapping.SourceLabel {
+									indices = append(indices, i)
+									labelKeys[i] = labelKeys[len(labelKeys)-1]
+									labelKeys = labelKeys[:len(labelKeys)-1]
+									break
+								}
+							}
+						}
+						if len(indices) < len(ltr.LabelToResources) {
+							me.loggerNoStacktrace.Debug("Mapping failed: ",
+								zap.String("metric", metric.GetMetricDescriptor().String()))
+							break
+						}
+						found = true
+						metric.MetricDescriptor.LabelKeys = labelKeys
+						for _, ts := range metric.Timeseries {
+							resourceLabels := make(map[string]string)
+							if metric.Resource != nil {
+								for k, v := range metric.Resource.Labels {
+									resourceLabels[k] = v
+								}
+							}
+
+							for iTarget, iSource := range indices {
+								resourceLabels[ltr.LabelToResources[iTarget].TargetResourceLabel] = ts.LabelValues[iSource].Value
+								ts.LabelValues[iSource] = ts.LabelValues[len(ts.LabelValues)-1]
+								ts.LabelValues = ts.LabelValues[:len(ts.LabelValues)-1]
+							}
+
+							//TODO: Optimize, do not create Metric for each ts if the same Resource labels
+							metrics = append(metrics, &metricspb.Metric{
+								Timeseries:       []*metricspb.TimeSeries{ts},
+								MetricDescriptor: metric.MetricDescriptor,
+								Resource: &resourcepb.Resource{
+									Type:   ltr.TargetType,
+									Labels: resourceLabels,
+								},
+							})
+						}
+						break
+					}
+				}
+			} else {
+				me.loggerNoStacktrace.Debug("Skipping Mapping: ",
+					zap.String("metric", metric.GetMetricDescriptor().String()))
+			}
+			if found {
+				break
+			}
+		}
+		if !found {
+			metrics = append(metrics, metric)
+		}
+	}
+	md.Metrics = metrics
 }
 
 func exportAdditionalLabels(mds []*agentmetricspb.ExportMetricsServiceRequest) []*agentmetricspb.ExportMetricsServiceRequest {
