@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/shirou/gopsutil/v3/host"
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/pmetric"
@@ -65,7 +64,7 @@ type scraper struct {
 
 // newDiskScraper creates a Disk Scraper
 func newDiskScraper(_ context.Context, cfg *Config) (*scraper, error) {
-	scraper := &scraper{config: cfg, perfCounterScraper: &perfcounters.PerfLibScraper{}, bootTime: host.BootTime}
+	scraper := &scraper{config: cfg, perfCounterScraper: &perfcounters.PerfLibScraper{}, bootTime: internal.CurrentTime}
 
 	var err error
 

@@ -20,10 +20,10 @@ package diskscraper // import "github.com/open-telemetry/opentelemetry-collector
 import (
 	"context"
 	"fmt"
+	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver/internal"
 	"time"
 
 	"github.com/shirou/gopsutil/v3/disk"
-	"github.com/shirou/gopsutil/v3/host"
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/pmetric"
@@ -53,7 +53,7 @@ type scraper struct {
 
 // newDiskScraper creates a Disk Scraper
 func newDiskScraper(_ context.Context, cfg *Config) (*scraper, error) {
-	scraper := &scraper{config: cfg, bootTime: host.BootTime, ioCounters: disk.IOCounters}
+	scraper := &scraper{config: cfg, bootTime: internal.CurrentTime, ioCounters: disk.IOCounters}
 
 	var err error
 

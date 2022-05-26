@@ -16,10 +16,10 @@ package loadscraper // import "github.com/open-telemetry/opentelemetry-collector
 
 import (
 	"context"
+	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver/internal"
 	"runtime"
 	"time"
 
-	"github.com/shirou/gopsutil/v3/host"
 	"github.com/shirou/gopsutil/v3/load"
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/pdata/pcommon"
@@ -45,7 +45,7 @@ type scraper struct {
 
 // newLoadScraper creates a set of Load related metrics
 func newLoadScraper(_ context.Context, logger *zap.Logger, cfg *Config) *scraper {
-	return &scraper{logger: logger, config: cfg, bootTime: host.BootTime, load: getSampledLoadAverages}
+	return &scraper{logger: logger, config: cfg, bootTime: internal.CurrentTime, load: getSampledLoadAverages}
 }
 
 // start

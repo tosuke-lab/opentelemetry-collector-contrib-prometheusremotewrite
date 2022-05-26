@@ -20,9 +20,9 @@ package pagingscraper // import "github.com/open-telemetry/opentelemetry-collect
 import (
 	"context"
 	"fmt"
+	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver/internal"
 	"time"
 
-	"github.com/shirou/gopsutil/v3/host"
 	"github.com/shirou/gopsutil/v3/mem"
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/pdata/pcommon"
@@ -50,7 +50,7 @@ type scraper struct {
 
 // newPagingScraper creates a Paging Scraper
 func newPagingScraper(_ context.Context, cfg *Config) *scraper {
-	return &scraper{config: cfg, bootTime: host.BootTime, getPageFileStats: getPageFileStats, swapMemory: mem.SwapMemory}
+	return &scraper{config: cfg, bootTime: internal.CurrentTime, getPageFileStats: getPageFileStats, swapMemory: mem.SwapMemory}
 }
 
 func (s *scraper) start(context.Context, component.Host) error {

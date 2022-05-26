@@ -17,9 +17,9 @@ package processscraper // import "github.com/open-telemetry/opentelemetry-collec
 import (
 	"context"
 	"fmt"
+	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver/internal"
 	"time"
 
-	"github.com/shirou/gopsutil/v3/host"
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/pmetric"
@@ -51,7 +51,7 @@ type scraper struct {
 
 // newProcessScraper creates a Process Scraper
 func newProcessScraper(cfg *Config) (*scraper, error) {
-	scraper := &scraper{config: cfg, bootTime: host.BootTime, getProcessHandles: getProcessHandlesInternal}
+	scraper := &scraper{config: cfg, bootTime: internal.CurrentTime, getProcessHandles: getProcessHandlesInternal}
 
 	var err error
 
