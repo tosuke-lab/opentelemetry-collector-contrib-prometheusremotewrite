@@ -16,6 +16,7 @@ package googlecloudexporter // import "github.com/open-telemetry/opentelemetry-c
 
 import (
 	"context"
+	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/resourcetotelemetry"
 	"time"
 
 	"github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/collector"
@@ -62,6 +63,7 @@ func createDefaultConfig() config.Exporter {
 			RetrySettings:    exporterhelper.NewDefaultRetrySettings(),
 			QueueSettings:    exporterhelper.NewDefaultQueueSettings(),
 			UserAgent:        "opentelemetry-collector-contrib {{version}}",
+			LabelsLimit:      0,
 		}
 	}
 	return &Config{
@@ -99,7 +101,6 @@ func createLogsExporter(
 		exporterhelper.WithRetry(eCfg.RetrySettings))
 }
 
-// createTracesExporter creates a trace exporter based on this config.
 func createTracesExporter(
 	ctx context.Context,
 	params component.ExporterCreateSettings,
@@ -140,7 +141,7 @@ func createMetricsExporter(
 	if err != nil {
 		return nil, err
 	}
-	return exporterhelper.NewMetricsExporter(
+	exporter, err := exporterhelper.NewMetricsExporter(
 		cfg,
 		params,
 		mExp.PushMetrics,
@@ -150,4 +151,8 @@ func createMetricsExporter(
 		exporterhelper.WithTimeout(exporterhelper.TimeoutSettings{Timeout: 0}),
 		exporterhelper.WithQueue(eCfg.QueueSettings),
 		exporterhelper.WithRetry(eCfg.RetrySettings))
+	if err != nil {
+		return nil, err
+	}
+	return resourcetotelemetry.WrapMetricsExporter(eCfg.ResourceToTelemetrySettings, exporter), nil
 }
