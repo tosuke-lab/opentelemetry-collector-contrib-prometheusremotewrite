@@ -7,6 +7,7 @@ require (
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/collector v0.32.3
 	github.com/census-instrumentation/opencensus-proto v0.3.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/internal/coreinternal v0.56.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/resourcetotelemetry v0.56.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/opencensus v0.56.0
 	github.com/stretchr/testify v1.8.0
 	go.opencensus.io v0.23.0

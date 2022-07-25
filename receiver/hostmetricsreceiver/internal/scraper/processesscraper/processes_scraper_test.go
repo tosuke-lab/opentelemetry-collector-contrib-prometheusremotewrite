@@ -20,7 +20,6 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/shirou/gopsutil/v3/host"
 	"github.com/shirou/gopsutil/v3/load"
 	"github.com/shirou/gopsutil/v3/process"
 	"github.com/stretchr/testify/assert"
@@ -162,7 +161,7 @@ func validateRealData(t *testing.T, metrics pmetric.MetricSlice) {
 }
 
 func validateStartTime(t *testing.T, metrics pmetric.MetricSlice) {
-	startTime, err := host.BootTime()
+	startTime, err := internal.CurrentTime()
 	assert.NoError(t, err)
 	for i := 0; i < metricsLength; i++ {
 		internal.AssertSumMetricStartTimeEquals(t, metrics.At(i), pcommon.Timestamp(startTime*1e9))

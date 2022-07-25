@@ -1,0 +1,9 @@
+receivers:
+  prometheusremotewrite:
+exporters:
+  nop:
+service:
+  pipelines:
+    metrics:
+      receivers: [ prometheusremotewrite ]
+      exporters: [ nop ]

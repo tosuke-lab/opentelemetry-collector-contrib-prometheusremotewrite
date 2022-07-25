@@ -17,9 +17,9 @@ package networkscraper // import "github.com/open-telemetry/opentelemetry-collec
 import (
 	"context"
 	"fmt"
+	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver/internal"
 	"time"
 
-	"github.com/shirou/gopsutil/v3/host"
 	"github.com/shirou/gopsutil/v3/net"
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/pdata/pcommon"
@@ -28,7 +28,6 @@ import (
 	"go.opentelemetry.io/collector/service/featuregate"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/internal/coreinternal/processor/filterset"
-	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver/internal"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver/internal/scraper/networkscraper/internal/metadata"
 )
 
@@ -60,7 +59,7 @@ func newNetworkScraper(_ context.Context, settings component.ReceiverCreateSetti
 	scraper := &scraper{
 		settings:                             settings,
 		config:                               cfg,
-		bootTime:                             host.BootTime,
+		bootTime:                             internal.CurrentTime,
 		ioCounters:                           net.IOCounters,
 		connections:                          net.Connections,
 		conntrack:                            net.FilterCounters,
