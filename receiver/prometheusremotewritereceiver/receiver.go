@@ -99,6 +99,7 @@ func (rec *PrometheusRemoteWriteReceiver) ServeHTTP(w http.ResponseWriter, r *ht
 	ctx := rec.obsrecv.StartMetricsOp(context.Background())
 
 	reg := regexp.MustCompile(`(\w+)_(\w+)_(\w+)\z`)
+	timeThreshold := time.Now().Add(-time.Hour * 24)
 	pms := pmetric.NewMetrics()
 
 	for _, ts := range req.Timeseries {
@@ -132,6 +133,10 @@ func (rec *PrometheusRemoteWriteReceiver) ServeHTTP(w http.ResponseWriter, r *ht
 			ppoint := pmetric.NewNumberDataPoint()
 			ppoint.SetDoubleVal(s.Value)
 			ppoint.SetTimestamp(pcommon.NewTimestampFromTime(time.Unix(0, s.Timestamp*int64(time.Millisecond))))
+			if ppoint.Timestamp().AsTime().Before(timeThreshold) {
+				rec.logger.Debug("Metric older than the threshold", zap.String("metric name", pm.Name()), zap.Time("metric_timestamp", ppoint.Timestamp().AsTime()))
+				continue
+			}
 			for _, l := range ts.Labels {
 				labelName := l.Name
 				if l.Name == "__name__" {
