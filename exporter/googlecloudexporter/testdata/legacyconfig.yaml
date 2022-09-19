@@ -12,6 +12,15 @@ exporters:
     user_agent: opentelemetry-collector-contrib {{version}}
     use_insecure: true
     timeout: 20s
+    labels_limit: 10
+    labels_to_resources:
+      - required_label: hostname
+        target_type: gke_instance
+        label_to_resource:
+          - source_label: hostname
+            target_resource_label: instance_id
+          - source_label: zone
+            target_resource_label: zone
     resource_mappings:
       - source_type: source.resource1
         target_type: target-resource1

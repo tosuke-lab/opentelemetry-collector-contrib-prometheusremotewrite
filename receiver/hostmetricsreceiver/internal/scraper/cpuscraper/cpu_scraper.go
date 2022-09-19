@@ -19,12 +19,12 @@ import (
 	"time"
 
 	"github.com/shirou/gopsutil/v3/cpu"
-	"github.com/shirou/gopsutil/v3/host"
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/pmetric"
 	"go.opentelemetry.io/collector/receiver/scrapererror"
 
+	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver/internal"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver/internal/scraper/cpuscraper/internal/metadata"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver/internal/scraper/cpuscraper/ucal"
 )
@@ -46,7 +46,7 @@ type scraper struct {
 
 // newCPUScraper creates a set of CPU related metrics
 func newCPUScraper(_ context.Context, settings component.ReceiverCreateSettings, cfg *Config) *scraper {
-	return &scraper{settings: settings, config: cfg, bootTime: host.BootTime, times: cpu.Times, ucal: &ucal.CPUUtilizationCalculator{}, now: time.Now}
+	return &scraper{settings: settings, config: cfg, bootTime: internal.CurrentTime, times: cpu.Times, ucal: &ucal.CPUUtilizationCalculator{}, now: time.Now}
 }
 
 func (s *scraper) start(context.Context, component.Host) error {

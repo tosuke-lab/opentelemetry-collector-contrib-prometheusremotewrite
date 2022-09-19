@@ -20,13 +20,13 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/shirou/gopsutil/v3/host"
 	"github.com/shirou/gopsutil/v3/mem"
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/pmetric"
 	"go.opentelemetry.io/collector/receiver/scrapererror"
 
+	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver/internal"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver/internal/scraper/memoryscraper/internal/metadata"
 )
 
@@ -47,7 +47,7 @@ type scraper struct {
 
 // newMemoryScraper creates a Memory Scraper
 func newMemoryScraper(_ context.Context, settings component.ReceiverCreateSettings, cfg *Config) *scraper {
-	return &scraper{settings: settings, config: cfg, bootTime: host.BootTime, virtualMemory: mem.VirtualMemory}
+	return &scraper{settings: settings, config: cfg, bootTime: internal.CurrentTime, virtualMemory: mem.VirtualMemory}
 }
 
 func (s *scraper) start(context.Context, component.Host) error {

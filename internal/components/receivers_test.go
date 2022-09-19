@@ -252,6 +252,10 @@ func TestDefaultReceivers(t *testing.T) {
 			},
 		},
 		{
+			receiver:     "prometheusremotewrite",
+			skipLifecyle: true,
+		},
+		{
 			receiver:     "prometheus_exec",
 			skipLifecyle: true, // Requires running a subproccess that can not be easily set across platforms
 		},

@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/shirou/gopsutil/v3/host"
 	"github.com/shirou/gopsutil/v3/net"
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/pdata/pcommon"
@@ -60,7 +59,7 @@ func newNetworkScraper(_ context.Context, settings component.ReceiverCreateSetti
 	scraper := &scraper{
 		settings:                             settings,
 		config:                               cfg,
-		bootTime:                             host.BootTime,
+		bootTime:                             internal.CurrentTime,
 		ioCounters:                           net.IOCounters,
 		connections:                          net.Connections,
 		conntrack:                            net.FilterCounters,

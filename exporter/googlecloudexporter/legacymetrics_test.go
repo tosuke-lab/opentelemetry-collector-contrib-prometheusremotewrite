@@ -16,6 +16,9 @@ package googlecloudexporter
 
 import (
 	"context"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/trace"
+	"go.uber.org/zap"
 	"net"
 	"testing"
 	"time"
@@ -259,6 +262,423 @@ func TestGoogleCloudMetricExport(t *testing.T) {
 		assert.Equal(t, ts.labels, tr.TimeSeries[i].Metric.Labels)
 		require.Len(t, tr.TimeSeries[i].Points, 1)
 		assert.Equal(t, ts.value, tr.TimeSeries[i].Points[0].Value.GetDoubleValue())
+		assert.Equal(t, ts.resourceLabels, tr.TimeSeries[i].Resource.Labels)
+	}
+}
+
+func TestGoogleCloudMetricExportWithLabelsLimitFiltering(t *testing.T) {
+	srv := grpc.NewServer()
+
+	descriptorReqCh := make(chan *requestWithMetadata)
+	timeSeriesReqCh := make(chan *requestWithMetadata)
+
+	mockServer := &mockMetricServer{descriptorReqCh: descriptorReqCh, timeSeriesReqCh: timeSeriesReqCh}
+	cloudmonitoringpb.RegisterMetricServiceServer(srv, mockServer)
+
+	lis, err := net.Listen("tcp", "localhost:8080")
+	require.NoError(t, err)
+	defer lis.Close()
+
+	go srv.Serve(lis)
+
+	// Example with overridden client options
+	clientOptions := []option.ClientOption{
+		option.WithoutAuthentication(),
+		option.WithTelemetryDisabled(),
+	}
+
+	sde, err := newLegacyGoogleCloudMetricsExporter(&LegacyConfig{
+		ExporterSettings: config.NewExporterSettings(config.NewComponentID(typeStr)),
+		ProjectID:        "idk",
+		Endpoint:         "127.0.0.1:8080",
+		UserAgent:        "MyAgent {{version}}",
+		UseInsecure:      true,
+		GetClientOptions: func() []option.ClientOption {
+			return clientOptions
+		},
+		LabelsLimit: 10,
+	},
+		component.ExporterCreateSettings{
+			TelemetrySettings: component.TelemetrySettings{
+				Logger:         zap.NewNop(),
+				TracerProvider: sdktrace.NewTracerProvider(),
+			},
+			BuildInfo: component.BuildInfo{
+				Version: "v0.0.1",
+			},
+		},
+	)
+	require.NoError(t, err)
+	defer func() { require.NoError(t, sde.Shutdown(context.Background())) }()
+
+	md := agentmetricspb.ExportMetricsServiceRequest{
+		Resource: &resourcepb.Resource{
+			Type: "host",
+			Labels: map[string]string{
+				"cloud.availability_zone": "us-central1",
+				"host.name":               "foo",
+				"k8s.cluster.name":        "test",
+				"contrib.opencensus.io/exporter/stackdriver/project_id": "1234567",
+			},
+		},
+		Metrics: []*metricspb.Metric{
+			ocmetricstestutil.Gauge(
+				"test_gauge1",
+				[]string{"k0"},
+				ocmetricstestutil.Timeseries(
+					time.Now(),
+					[]string{"v0"},
+					ocmetricstestutil.Double(time.Now(), 1))),
+			ocmetricstestutil.Gauge(
+				"test_gauge2",
+				[]string{"k0", "k1"},
+				ocmetricstestutil.Timeseries(
+					time.Now(),
+					[]string{"v0", "v1"},
+					ocmetricstestutil.Double(time.Now(), 12))),
+			ocmetricstestutil.Gauge(
+				"test_gauge3",
+				[]string{"k0", "k1", "k2"},
+				ocmetricstestutil.Timeseries(
+					time.Now(),
+					[]string{"v0", "v1", "v2"},
+					ocmetricstestutil.Double(time.Now(), 123))),
+			// Metric test_gauge4 has 11 labels - should be dropped
+			ocmetricstestutil.Gauge(
+				"test_gauge4",
+				[]string{"k0", "k1", "k2", "k3", "k4", "k5", "k6", "k7", "k8", "k9", "k10"},
+				ocmetricstestutil.Timeseries(
+					time.Now(),
+					[]string{"v0", "v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10"},
+					ocmetricstestutil.Double(time.Now(), 1234))),
+			ocmetricstestutil.Gauge(
+				"test_gauge5",
+				[]string{"k4", "k5"},
+				ocmetricstestutil.Timeseries(
+					time.Now(),
+					[]string{"v4", "v5"},
+					ocmetricstestutil.Double(time.Now(), 34))),
+		},
+	}
+	md.Metrics[2].Resource = &resourcepb.Resource{
+		Type: "host",
+		Labels: map[string]string{
+			"cloud.availability_zone": "us-central1",
+			"host.name":               "bar",
+			"k8s.cluster.name":        "test",
+			"contrib.opencensus.io/exporter/stackdriver/project_id": "1234567",
+		},
+	}
+	md.Metrics[3].Resource = &resourcepb.Resource{
+		Type: "host",
+		Labels: map[string]string{
+			"contrib.opencensus.io/exporter/stackdriver/project_id": "1234567",
+		},
+	}
+	md.Metrics[4].Resource = &resourcepb.Resource{
+		Type: "test",
+	}
+
+	assert.NoError(t, sde.ConsumeMetrics(context.Background(), internaldata.OCToMetrics(md.Node, md.Resource, md.Metrics)), err)
+
+	expectedNames := map[string]struct{}{
+		"projects/idk/metricDescriptors/custom.googleapis.com/opencensus/test_gauge1": {},
+		"projects/idk/metricDescriptors/custom.googleapis.com/opencensus/test_gauge2": {},
+		"projects/idk/metricDescriptors/custom.googleapis.com/opencensus/test_gauge3": {},
+		"projects/idk/metricDescriptors/custom.googleapis.com/opencensus/test_gauge5": {},
+	}
+	for i := 0; i < 4; i++ {
+		drm := <-descriptorReqCh
+		assert.Regexp(t, "MyAgent v0\\.0\\.1", drm.metadata["user-agent"])
+		dr := drm.req.(*cloudmonitoringpb.CreateMetricDescriptorRequest)
+		assert.Contains(t, expectedNames, dr.MetricDescriptor.Name)
+		delete(expectedNames, dr.MetricDescriptor.Name)
+	}
+
+	trm := <-timeSeriesReqCh
+	assert.Regexp(t, "MyAgent v0\\.0\\.1", trm.metadata["user-agent"])
+	tr := trm.req.(*cloudmonitoringpb.CreateTimeSeriesRequest)
+	require.Len(t, tr.TimeSeries, 4)
+
+	expectedTimeSeries := map[string]struct {
+		value  float64
+		labels map[string]string
+	}{
+		"custom.googleapis.com/opencensus/test_gauge1": {
+			value:  float64(1),
+			labels: map[string]string{"k0": "v0"},
+		},
+		"custom.googleapis.com/opencensus/test_gauge2": {
+			value:  float64(12),
+			labels: map[string]string{"k0": "v0", "k1": "v1"},
+		},
+		"custom.googleapis.com/opencensus/test_gauge3": {
+			value:  float64(123),
+			labels: map[string]string{"k0": "v0", "k1": "v1", "k2": "v2"},
+		},
+		"custom.googleapis.com/opencensus/test_gauge5": {
+			value:  float64(34),
+			labels: map[string]string{"k4": "v4", "k5": "v5"},
+		},
+	}
+	for i := 0; i < 4; i++ {
+		require.Contains(t, expectedTimeSeries, tr.TimeSeries[i].Metric.Type)
+		ts := expectedTimeSeries[tr.TimeSeries[i].Metric.Type]
+		assert.Equal(t, ts.labels, tr.TimeSeries[i].Metric.Labels)
+		require.Len(t, tr.TimeSeries[i].Points, 1)
+		assert.Equal(t, ts.value, tr.TimeSeries[i].Points[0].Value.GetDoubleValue())
+	}
+}
+
+func TestGoogleCloudMetricExportLabelsToResource(t *testing.T) {
+	srv := grpc.NewServer()
+
+	descriptorReqCh := make(chan *requestWithMetadata)
+	timeSeriesReqCh := make(chan *requestWithMetadata)
+
+	mockServer := &mockMetricServer{descriptorReqCh: descriptorReqCh, timeSeriesReqCh: timeSeriesReqCh}
+	cloudmonitoringpb.RegisterMetricServiceServer(srv, mockServer)
+
+	lis, err := net.Listen("tcp", "localhost:8080")
+	require.NoError(t, err)
+	defer lis.Close()
+
+	go srv.Serve(lis)
+
+	// Example with overridden client options
+	clientOptions := []option.ClientOption{
+		option.WithoutAuthentication(),
+		option.WithTelemetryDisabled(),
+	}
+
+	sde, err := newLegacyGoogleCloudMetricsExporter(&LegacyConfig{
+		ExporterSettings: config.NewExporterSettings(config.NewComponentID(typeStr)),
+		ProjectID:        "idk",
+		Endpoint:         "127.0.0.1:8080",
+		UserAgent:        "MyAgent {{version}}",
+		UseInsecure:      true,
+		GetClientOptions: func() []option.ClientOption {
+			return clientOptions
+		},
+		LabelsToResources: []LabelsToResource{
+			{
+				RequiredLabel: "k0",
+				TargetType:    "wrong",
+				LabelToResources: []LabelToResource{
+					{
+						SourceLabel:         "k0",
+						TargetResourceLabel: "instance_id",
+					},
+					{
+						SourceLabel:         "k100",
+						TargetResourceLabel: "zone",
+					},
+				},
+			},
+			{
+				RequiredLabel: "k1",
+				TargetType:    "gke_instance",
+				LabelToResources: []LabelToResource{
+					{
+						SourceLabel:         "k1",
+						TargetResourceLabel: "zone",
+					},
+					{
+						SourceLabel:         "k2",
+						TargetResourceLabel: "instance_id",
+					},
+				},
+			},
+		},
+		ResourceMappings: []ResourceMapping{
+			{
+				SourceType: "gke_instance",
+				TargetType: "gke_instance",
+				LabelMappings: []LabelMapping{
+					{
+						SourceKey: "instance_id",
+						TargetKey: "instance_id",
+					},
+					{
+						SourceKey: "zone",
+						TargetKey: "zone",
+					},
+				},
+			},
+		},
+	},
+		component.ExporterCreateSettings{
+			TelemetrySettings: component.TelemetrySettings{
+				Logger:         zap.NewNop(),
+				TracerProvider: trace.NewNoopTracerProvider(),
+			},
+			BuildInfo: component.BuildInfo{
+				Version: "v0.0.1",
+			},
+		},
+	)
+	require.NoError(t, err)
+	defer func() { require.NoError(t, sde.Shutdown(context.Background())) }()
+
+	md := agentmetricspb.ExportMetricsServiceRequest{
+		Resource: &resourcepb.Resource{
+			Type: "host",
+			Labels: map[string]string{
+				"cloud.availability_zone": "us-central1",
+				"host.name":               "foo",
+				"k8s.cluster.name":        "test",
+				"contrib.opencensus.io/exporter/stackdriver/project_id": "1234567",
+			},
+		},
+		Metrics: []*metricspb.Metric{
+			ocmetricstestutil.Gauge(
+				"test_gauge1",
+				[]string{"k0"},
+				ocmetricstestutil.Timeseries(
+					time.Now(),
+					[]string{"v0"},
+					ocmetricstestutil.Double(time.Now(), 1))),
+			ocmetricstestutil.Gauge(
+				"test_gauge2",
+				[]string{"k0", "k1", "k2"},
+				ocmetricstestutil.Timeseries(
+					time.Now(),
+					[]string{"v0", "v1", "v2"},
+					ocmetricstestutil.Double(time.Now(), 12))),
+			ocmetricstestutil.Gauge(
+				"test_gauge3",
+				[]string{"k1", "k2", "k3"},
+				ocmetricstestutil.Timeseries(
+					time.Now(),
+					[]string{"v1", "v2", "v3"},
+					ocmetricstestutil.Double(time.Now(), 123)),
+				ocmetricstestutil.Timeseries(
+					time.Now(),
+					[]string{"v1_2", "v2_2", "v3_2"},
+					ocmetricstestutil.Double(time.Now(), 1234)),
+				ocmetricstestutil.Timeseries(
+					time.Now(),
+					[]string{"v1_2", "v2_2", "v3_3"},
+					ocmetricstestutil.Double(time.Now(), 12345))),
+			ocmetricstestutil.Gauge(
+				"test_gauge4",
+				[]string{"k0", "k1"},
+				ocmetricstestutil.Timeseries(
+					time.Now(),
+					[]string{"v0", "v1"},
+					ocmetricstestutil.Double(time.Now(), 123456))),
+		},
+	}
+	md.Metrics[2].Resource = &resourcepb.Resource{
+		Type: "host",
+		Labels: map[string]string{
+			"cloud.availability_zone": "us-central1",
+			"host.name":               "bar",
+			"k8s.cluster.name":        "test",
+			"contrib.opencensus.io/exporter/stackdriver/project_id": "1234567",
+		},
+	}
+
+	id := internaldata.OCToMetrics(md.Node, md.Resource, md.Metrics)
+
+	cm := sde.ConsumeMetrics(context.Background(), id)
+
+	assert.NoError(t, cm, err)
+
+	expectedNames := map[string]struct{}{
+		"projects/idk/metricDescriptors/custom.googleapis.com/opencensus/test_gauge1": {},
+		"projects/idk/metricDescriptors/custom.googleapis.com/opencensus/test_gauge2": {},
+		"projects/idk/metricDescriptors/custom.googleapis.com/opencensus/test_gauge3": {},
+		"projects/idk/metricDescriptors/custom.googleapis.com/opencensus/test_gauge4": {},
+	}
+	for i := 0; i < 4; i++ {
+		drm := <-descriptorReqCh
+		assert.Regexp(t, "MyAgent v0\\.0\\.1", drm.metadata["user-agent"])
+		dr := drm.req.(*cloudmonitoringpb.CreateMetricDescriptorRequest)
+		assert.Contains(t, expectedNames, dr.MetricDescriptor.Name)
+		delete(expectedNames, dr.MetricDescriptor.Name)
+	}
+
+	trm := <-timeSeriesReqCh
+	assert.Regexp(t, "MyAgent v0\\.0\\.1", trm.metadata["user-agent"])
+	tr := trm.req.(*cloudmonitoringpb.CreateTimeSeriesRequest)
+	require.Len(t, tr.TimeSeries, 6)
+
+	resource1 := map[string]string{
+		"node_name":    "foo",
+		"cluster_name": "test",
+		"location":     "us-central1",
+		"project_id":   "1234567",
+	}
+
+	resource2 := map[string]string{
+		"instance_id": "v2",
+		"zone":        "v1",
+	}
+
+	resource3 := map[string]string{
+		"instance_id": "v2_2",
+		"zone":        "v1_2",
+	}
+
+	expectedTimeSeries := map[struct {
+		name  string
+		value float64
+	}]struct {
+		labels         map[string]string
+		resourceLabels map[string]string
+	}{
+		{
+			name:  "custom.googleapis.com/opencensus/test_gauge1",
+			value: float64(1),
+		}: {
+
+			labels:         map[string]string{"k0": "v0"},
+			resourceLabels: resource1,
+		},
+		{
+			name:  "custom.googleapis.com/opencensus/test_gauge2",
+			value: float64(12),
+		}: {
+			labels:         map[string]string{"k0": "v0"},
+			resourceLabels: resource2,
+		},
+		{
+			name:  "custom.googleapis.com/opencensus/test_gauge3",
+			value: float64(123),
+		}: {
+			labels:         map[string]string{"k3": "v3"},
+			resourceLabels: resource2,
+		},
+		{
+			name:  "custom.googleapis.com/opencensus/test_gauge3",
+			value: float64(1234),
+		}: {
+			labels:         map[string]string{"k3": "v3_2"},
+			resourceLabels: resource3,
+		},
+		{
+			name:  "custom.googleapis.com/opencensus/test_gauge3",
+			value: float64(12345),
+		}: {
+			labels:         map[string]string{"k3": "v3_3"},
+			resourceLabels: resource3,
+		},
+		{
+			name:  "custom.googleapis.com/opencensus/test_gauge4",
+			value: float64(123456),
+		}: {
+			labels:         map[string]string{"k0": "v0", "k1": "v1"},
+			resourceLabels: resource1,
+		},
+	}
+	for i := 0; i < 6; i++ {
+		ts := expectedTimeSeries[struct {
+			name  string
+			value float64
+		}{name: tr.TimeSeries[i].Metric.Type, value: tr.TimeSeries[i].Points[0].Value.GetDoubleValue()}]
+		assert.Equal(t, ts.labels, tr.TimeSeries[i].Metric.Labels)
+		require.Len(t, tr.TimeSeries[i].Points, 1)
 		assert.Equal(t, ts.resourceLabels, tr.TimeSeries[i].Resource.Labels)
 	}
 }

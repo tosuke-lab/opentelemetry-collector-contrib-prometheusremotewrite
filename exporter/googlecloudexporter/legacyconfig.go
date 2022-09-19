@@ -15,6 +15,7 @@ package googlecloudexporter // import "github.com/open-telemetry/opentelemetry-c
 
 import (
 	"github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/collector"
+	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/resourcetotelemetry"
 	"go.opentelemetry.io/collector/config"
 	"go.opentelemetry.io/collector/exporter/exporterhelper"
 	"google.golang.org/api/option"
@@ -40,6 +41,18 @@ type LegacyConfig struct {
 	// Must be set programmatically (no support via declarative config).
 	// Optional.
 	GetClientOptions func() []option.ClientOption
+	// ClientOption for authentication via API key
+	CredentialFileName string `mapstructure:"credential_file_name"`
+
+	// ResourceToTelemetrySettings is the option for converting resource attributes to telemetry attributes.
+	// "Enabled" - A boolean field to enable/disable this option. Default is `false`.
+	// If enabled, all the resource attributes will be converted to metric labels by default.
+	ResourceToTelemetrySettings resourcetotelemetry.Settings `mapstructure:"resource_to_telemetry_conversion"`
+
+	// Max number of metric's labels. Metrics exceeding this would be dropped. Default 0 = no limit
+	LabelsLimit int `mapstructure:"labels_limit"`
+
+	LabelsToResources []LabelsToResource `mapstructure:"labels_to_resources"`
 
 	MetricConfig MetricConfig `mapstructure:"metric"`
 }
