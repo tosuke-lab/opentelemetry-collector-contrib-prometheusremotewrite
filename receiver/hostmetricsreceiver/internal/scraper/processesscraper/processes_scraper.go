@@ -16,9 +16,9 @@ package processesscraper // import "github.com/open-telemetry/opentelemetry-coll
 
 import (
 	"context"
+	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver/internal"
 	"time"
 
-	"github.com/shirou/gopsutil/v3/host"
 	"github.com/shirou/gopsutil/v3/load"
 	"github.com/shirou/gopsutil/v3/process"
 	"go.opentelemetry.io/collector/component"
@@ -79,7 +79,7 @@ func newProcessesScraper(_ context.Context, settings component.ReceiverCreateSet
 }
 
 func (s *scraper) start(context.Context, component.Host) error {
-	bootTime, err := host.BootTime()
+	bootTime, err := internal.CurrentTime()
 	if err != nil {
 		return err
 	}

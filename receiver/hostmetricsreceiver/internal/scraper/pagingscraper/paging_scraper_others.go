@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/shirou/gopsutil/v3/host"
 	"github.com/shirou/gopsutil/v3/mem"
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/pdata/pcommon"
@@ -58,7 +57,7 @@ func newPagingScraper(_ context.Context, settings component.ReceiverCreateSettin
 	return &scraper{
 		settings:                             settings,
 		config:                               cfg,
-		bootTime:                             host.BootTime,
+		bootTime:                             internal.CurrentTime,
 		getPageFileStats:                     getPageFileStats,
 		swapMemory:                           mem.SwapMemory,
 		emitMetricsWithDirectionAttribute:    featuregate.GetRegistry().IsEnabled(internal.EmitMetricsWithDirectionAttributeFeatureGateID),

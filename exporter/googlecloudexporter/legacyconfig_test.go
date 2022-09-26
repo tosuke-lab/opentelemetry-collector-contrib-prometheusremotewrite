@@ -49,6 +49,23 @@ func TestLoadLegacyConfig(t *testing.T) {
 			TimeoutSettings: exporterhelper.TimeoutSettings{
 				Timeout: 20 * time.Second,
 			},
+			LabelsLimit: 10,
+			LabelsToResources: []LabelsToResource{
+				{
+					RequiredLabel: "hostname",
+					TargetType:    "gke_instance",
+					LabelToResources: []LabelToResource{
+						{
+							SourceLabel:         "hostname",
+							TargetResourceLabel: "instance_id",
+						},
+						{
+							SourceLabel:         "zone",
+							TargetResourceLabel: "zone",
+						},
+					},
+				},
+			},
 			ResourceMappings: []ResourceMapping{
 				{
 					SourceType: "source.resource1",
