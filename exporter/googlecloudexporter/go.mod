@@ -5,6 +5,7 @@ go 1.19
 require (
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/collector v0.35.2
 	github.com/cenkalti/backoff/v4 v4.2.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/resourcetotelemetry v0.72.0
 	github.com/stretchr/testify v1.8.1
 	go.opentelemetry.io/collector v0.72.0
 	go.opentelemetry.io/collector/component v0.72.0
@@ -34,7 +35,6 @@ require (
 	github.com/googleapis/gax-go/v2 v2.7.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/knadh/koanf v1.5.0 // indirect
-	github.com/kr/text v0.2.0 // indirect
 	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
@@ -68,3 +68,7 @@ require (
 )
 
 retract v0.65.0
+
+replace github.com/open-telemetry/opentelemetry-collector-contrib/pkg/resourcetotelemetry => ../../pkg/resourcetotelemetry
+
+replace github.com/open-telemetry/opentelemetry-collector-contrib/internal/coreinternal => ../../internal/coreinternal

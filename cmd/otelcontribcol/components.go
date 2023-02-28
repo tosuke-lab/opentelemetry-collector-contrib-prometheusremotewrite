@@ -145,6 +145,7 @@ import (
 	podmanreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/podmanreceiver"
 	postgresqlreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/postgresqlreceiver"
 	prometheusreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver"
+	prometheusremotewritereceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusremotewritereceiver"
 	purefareceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/purefareceiver"
 	purefbreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/purefbreceiver"
 	rabbitmqreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/rabbitmqreceiver"
@@ -250,6 +251,7 @@ func components() (otelcol.Factories, error) {
 		podmanreceiver.NewFactory(),
 		postgresqlreceiver.NewFactory(),
 		prometheusreceiver.NewFactory(),
+		prometheusremotewritereceiver.NewFactory(),
 		purefareceiver.NewFactory(),
 		purefbreceiver.NewFactory(),
 		rabbitmqreceiver.NewFactory(),

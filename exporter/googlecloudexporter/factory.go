@@ -23,6 +23,8 @@ import (
 	"go.opentelemetry.io/collector/exporter"
 	"go.opentelemetry.io/collector/exporter/exporterhelper"
 	"go.opentelemetry.io/collector/featuregate"
+
+	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/resourcetotelemetry"
 )
 
 const (
@@ -117,7 +119,7 @@ func createMetricsExporter(
 	if err != nil {
 		return nil, err
 	}
-	return exporterhelper.NewMetricsExporter(
+	exporter, err := exporterhelper.NewMetricsExporter(
 		ctx,
 		params,
 		cfg,
@@ -128,4 +130,8 @@ func createMetricsExporter(
 		exporterhelper.WithTimeout(exporterhelper.TimeoutSettings{Timeout: 0}),
 		exporterhelper.WithQueue(eCfg.QueueSettings),
 		exporterhelper.WithRetry(eCfg.RetrySettings))
+	if err != nil {
+		return nil, err
+	}
+	return resourcetotelemetry.WrapMetricsExporter(eCfg.ResourceToTelemetrySettings, exporter), nil
 }
