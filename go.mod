@@ -135,6 +135,7 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/postgresqlreceiver v0.73.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusexecreceiver v0.73.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver v0.73.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusremotewritereceiver v0.73.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/pulsarreceiver v0.73.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/purefareceiver v0.73.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/purefbreceiver v0.73.0
@@ -972,6 +973,8 @@ replace github.com/open-telemetry/opentelemetry-collector-contrib/receiver/postg
 replace github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusexecreceiver => ./receiver/prometheusexecreceiver
 
 replace github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver => ./receiver/prometheusreceiver
+
+replace github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusremotewritereceiver => ./receiver/prometheusremotewritereceiver
 
 replace github.com/open-telemetry/opentelemetry-collector-contrib/receiver/pulsarreceiver => ./receiver/pulsarreceiver
 

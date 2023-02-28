@@ -751,6 +751,10 @@ updates:
     schedule:
       interval: "weekly"
   - package-ecosystem: "gomod"
+    directory: "/receiver/prometheusremotewritereceiver"
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: "gomod"
     directory: "/receiver/promtailreceiver"
     schedule:
       interval: "weekly"
