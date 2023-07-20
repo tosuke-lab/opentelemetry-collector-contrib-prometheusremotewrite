@@ -35,6 +35,7 @@ import (
 	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/mongodbatlasreceiver"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/otlpjsonfilereceiver"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver"
+	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusremotewritereceiver"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/snmpreceiver"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/syslogreceiver"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/tcplogreceiver"
@@ -323,6 +324,13 @@ func TestDefaultReceivers(t *testing.T) {
 						{JobName: "test"},
 					},
 				}
+				return cfg
+			},
+		},
+		{
+			receiver: "prometheusremotewrite",
+			getConfigFn: func() component.Config {
+				cfg := rcvrFactories["prometheusremotewrite"].CreateDefaultConfig().(*prometheusremotewritereceiver.Config)
 				return cfg
 			},
 		},

@@ -201,6 +201,7 @@ body:
       - receiver/postgresql
       - receiver/prometheus
       - receiver/prometheusexec
+      - receiver/prometheusremotewrite
       - receiver/pulsar
       - receiver/purefa
       - receiver/purefb
