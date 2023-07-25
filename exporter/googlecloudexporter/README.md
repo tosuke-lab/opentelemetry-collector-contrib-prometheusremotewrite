@@ -169,6 +169,9 @@ The following configuration options are supported:
 - `project` (default = Fetch from Credentials): GCP project identifier.
 - `destination_project_quota` (optional): Counts quota for traces and metrics against the project to which the data is sent (as opposed to the project associated with the Collector's service account. For example, when setting `project_id` or using [multi-project export](#multi-project-exporting). (default = false)
 - `user_agent` (default = `opentelemetry-collector-contrib {{version}}`): Override the user agent string sent on requests to Cloud Monitoring (currently only applies to metrics). Specify `{{version}}` to include the application version number.
+- `timeout` (optional): Timeout for all API calls. If not set, defaults to 12 seconds.
+- `resource_mappings` (optional): ResourceMapping defines mapping of resources from source (OpenCensus) to target (Google Cloud).
+    - `label_mappings` (optional): Optional flag signals whether we can proceed with transformation if a label is missing in the resource.
 - `impersonate` (optional): Configuration for service account impersonation
   - `target_principal`: TargetPrincipal is the email address of the service account to impersonate.
   - `subject`: (optional) Subject is the sub field of a JWT. This field should only be set if you wish to impersonate as a user. This feature is useful when using domain wide delegation.
