@@ -38,6 +38,7 @@ var (
 	value41            = "test_value41"
 	label51            = "_test_label51"
 	value51            = "test_value51"
+	value71            = "test_value71_sum"
 	dirty1             = "%"
 	dirty2             = "?"
 	traceIDValue1      = "4303853f086f4f8c86cf198b6551df84"

@@ -215,17 +215,23 @@ func (s *scraper) getProcessMetadata() ([]*processMetadata, error) {
 
 		command, err := getProcessCommand(handle)
 		if err != nil {
-			errs.AddPartial(0, fmt.Errorf("error reading command for process %q (pid %v): %w", executable.name, pid, err))
+			if !s.config.MuteProcessNameError {
+				errs.AddPartial(0, fmt.Errorf("error reading command for process %q (pid %v): %w", executable.name, pid, err))
+			}
 		}
 
 		username, err := handle.Username()
 		if err != nil {
-			errs.AddPartial(0, fmt.Errorf("error reading username for process %q (pid %v): %w", executable.name, pid, err))
+			if !s.config.MuteProcessNameError {
+				errs.AddPartial(0, fmt.Errorf("error reading username for process %q (pid %v): %w", executable.name, pid, err))
+			}
 		}
 
 		createTime, err := s.getProcessCreateTime(handle)
 		if err != nil {
-			errs.AddPartial(0, fmt.Errorf("error reading create time for process %q (pid %v): %w", executable.name, pid, err))
+			if !s.config.MuteProcessNameError {
+				errs.AddPartial(0, fmt.Errorf("error reading create time for process %q (pid %v): %w", executable.name, pid, err))
+			}
 			// set the start time to now to avoid including this when a scrape_process_delay is set
 			createTime = time.Now().UnixMilli()
 		}
@@ -235,7 +241,9 @@ func (s *scraper) getProcessMetadata() ([]*processMetadata, error) {
 
 		parentPid, err := parentPid(handle, pid)
 		if err != nil {
-			errs.AddPartial(0, fmt.Errorf("error reading parent pid for process %q (pid %v): %w", executable.name, pid, err))
+			if !s.config.MuteProcessNameError {
+				errs.AddPartial(0, fmt.Errorf("error reading parent pid for process %q (pid %v): %w", executable.name, pid, err))
+			}
 		}
 
 		md := &processMetadata{

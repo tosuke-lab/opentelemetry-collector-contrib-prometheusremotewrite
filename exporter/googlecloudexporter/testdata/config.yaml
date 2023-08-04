@@ -3,6 +3,15 @@ googlecloud/customname:
   project: my-project
   user_agent: opentelemetry-collector-contrib {{version}}
   timeout: 20s
+  labels_limit: 10
+  labels_to_resources:
+  - required_label: hostname
+    target_type: gke_instance
+    label_to_resource:
+    - source_label: hostname
+      target_resource_label: instance_id
+    - source_label: zone
+      target_resource_label: zone
   sending_queue:
     enabled: true
     num_consumers: 2
