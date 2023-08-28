@@ -14,6 +14,8 @@ import (
 	"sort"
 	"strings"
 
+	_ "github.com/knadh/koanf/maps"
+	_ "github.com/knadh/koanf/providers/confmap"
 	"go.opentelemetry.io/collector/confmap/provider/fileprovider"
 )
 

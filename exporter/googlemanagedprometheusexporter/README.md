@@ -23,6 +23,9 @@ The following configuration options are supported:
 
 - `project` (optional): GCP project identifier.
 - `user_agent` (optional): Override the user agent string sent on requests to Cloud Monitoring (currently only applies to metrics). Specify `{{version}}` to include the application version number. Defaults to `opentelemetry-collector-contrib {{version}}`.
+- `timeout` (optional): Timeout for all API calls. If not set, defaults to 12 seconds.
+- `resource_mappings` (optional): ResourceMapping defines mapping of resources from source (OpenCensus) to target (Google Cloud).
+  - `label_mappings` (optional): Optional flag signals whether we can proceed with transformation if a label is missing in the resource.
 - `metric`(optional): Configuration for sending metrics to Cloud Monitoring.
   - `endpoint` (optional): Endpoint where metric data is going to be sent to. Replaces `endpoint`.
   - `compression` (optional): Compression format for Metrics gRPC requests. Supported values: [`gzip`].  Defaults to no compression.
