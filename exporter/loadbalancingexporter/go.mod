@@ -8,7 +8,7 @@ require (
 	go.opencensus.io v0.24.0
 	go.opentelemetry.io/collector v0.82.0
 	go.opentelemetry.io/collector/component v0.82.0
-	go.opentelemetry.io/collector/confmap v0.82.0
+	go.opentelemetry.io/collector/confmap v0.92.0
 	go.opentelemetry.io/collector/consumer v0.82.0
 	go.opentelemetry.io/collector/exporter v0.82.0
 	go.opentelemetry.io/collector/exporter/otlpexporter v0.82.0
@@ -50,6 +50,7 @@ require (
 	github.com/google/gofuzz v1.1.0 // indirect
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.16.2 // indirect
+	github.com/hashicorp/go-version v1.6.0 // indirect
 	github.com/imdario/mergo v0.3.6 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
@@ -93,7 +94,7 @@ require (
 	go.opentelemetry.io/collector/connector v0.82.0 // indirect
 	go.opentelemetry.io/collector/extension v0.82.0 // indirect
 	go.opentelemetry.io/collector/extension/auth v0.82.0 // indirect
-	go.opentelemetry.io/collector/featuregate v1.0.0-rcv0014 // indirect
+	go.opentelemetry.io/collector/featuregate v1.0.1 // indirect
 	go.opentelemetry.io/collector/processor v0.82.0 // indirect
 	go.opentelemetry.io/collector/receiver v0.82.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.42.1-0.20230612162650-64be7e574a17 // indirect
