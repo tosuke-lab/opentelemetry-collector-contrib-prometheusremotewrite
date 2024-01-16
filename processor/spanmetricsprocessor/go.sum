@@ -1108,8 +1108,8 @@ go.opentelemetry.io/collector/processor v0.82.0 h1:DoqVrrnGYThu/h1sOr6E0hR1Fj5nQ
 go.opentelemetry.io/collector/processor v0.82.0/go.mod h1:B0MtfLWCYNBJ+PXf9k77M2Yn08MKItNB2vuvwhqrtt0=
 go.opentelemetry.io/collector/receiver v0.82.0 h1:bc6jc8jmSgc0/C9zqTqqWOGJFVx0AJ53jiToSmQs2SE=
 go.opentelemetry.io/collector/receiver v0.82.0/go.mod h1:Uh6BgcTmmrA1Bm/GpKGRY6WwQyPio4yEDsYkUo0A5Gk=
-go.opentelemetry.io/collector/semconv v0.82.0 h1:WUeT2a+uZjI6kLvwcBaJnGvo7KSQ/9dIFRcxOQdXucc=
-go.opentelemetry.io/collector/semconv v0.82.0/go.mod h1:TlYPtzvsXyHOgr5eATi43qEMqwSmIziivJB2uctKswo=
+go.opentelemetry.io/collector/semconv v0.92.0 h1:3+OGPPuVu4rtrz8qGbpbiw7eKKULj4iJaSDTV52HM40=
+go.opentelemetry.io/collector/semconv v0.92.0/go.mod h1:gZ0uzkXsN+J5NpiRcdp9xOhNGQDDui8Y62p15sKrlzo=
 go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.42.1-0.20230612162650-64be7e574a17 h1:mdcNStUIXngF/mH3xxAo4nbR4g65IXqLL1SvYMjz7JQ=
 go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.42.1-0.20230612162650-64be7e574a17/go.mod h1:N2Nw/UmmvQn0yCnaUzvsWzTWIeffYIdFteg6mxqCWII=
 go.opentelemetry.io/otel v1.16.0 h1:Z7GVAX/UkAXPKsy94IU+i6thsQS4nb7LviLpnaNeW8s=
@@ -1125,8 +1125,7 @@ go.opentelemetry.io/proto/otlp v0.7.0/go.mod h1:PqfVotwruBrMGOCsRd/89rSnXhoiJIqe
 go.opentelemetry.io/proto/otlp v0.15.0/go.mod h1:H7XAot3MsfNsj7EXtrA2q5xSNQ10UqI405h3+duxN4U=
 go.opentelemetry.io/proto/otlp v0.19.0/go.mod h1:H7XAot3MsfNsj7EXtrA2q5xSNQ10UqI405h3+duxN4U=
 go.uber.org/atomic v1.7.0/go.mod h1:fEN4uk6kAWBTFdckzkM89CLk9XfWZrxpCo0nPH17wJc=
-go.uber.org/goleak v1.2.1 h1:NBol2c7O1ZokfZ0LEU9K6Whx/KnwvepVetCUhtKja4A=
-go.uber.org/goleak v1.2.1/go.mod h1:qlT2yGI9QafXHhZZLxlSuNsMw3FFLxBr+tBRlmO1xH4=
+go.uber.org/goleak v1.3.0 h1:2K3zAYmnTNqV73imy9J1T3WC+gmCePx2hEGkimedGto=
 go.uber.org/multierr v1.6.0/go.mod h1:cdWPpRnG4AhwMwsgIHip0KRBQjJy5kYEpYjJxpXp9iU=
 go.uber.org/multierr v1.11.0 h1:blXXJkSxSSfBVBlC76pxqeO+LN3aDfLQo+309xJstO0=
 go.uber.org/multierr v1.11.0/go.mod h1:20+QtiLqy0Nd6FdQB9TLXag12DsQkrbs3htMFfDN80Y=
