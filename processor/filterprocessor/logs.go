@@ -18,11 +18,16 @@ import (
 	"context"
 	"fmt"
 
+	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/pdata/plog"
 	"go.opentelemetry.io/collector/processor/processorhelper"
+	"go.uber.org/multierr"
 	"go.uber.org/zap"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/internal/coreinternal/processor/filterlog"
+	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/ottl"
+	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/ottl/contexts/ottllog"
+	"github.com/open-telemetry/opentelemetry-collector-contrib/processor/filterprocessor/internal/common"
 )
 
 type filterLogProcessor struct {
@@ -30,9 +35,24 @@ type filterLogProcessor struct {
 	excludeMatcher filterlog.Matcher
 	includeMatcher filterlog.Matcher
 	logger         *zap.Logger
+	logConditions  []*ottl.Statement[ottllog.TransformContext]
 }
 
 func newFilterLogsProcessor(logger *zap.Logger, cfg *Config) (*filterLogProcessor, error) {
+	if cfg.Logs.LogConditions != nil {
+		logp := ottllog.NewParser(common.Functions[ottllog.TransformContext](), component.TelemetrySettings{Logger: zap.NewNop()})
+		statements, err := logp.ParseStatements(common.PrepareConditionForParsing(cfg.Logs.LogConditions))
+		if err != nil {
+			return nil, err
+		}
+
+		return &filterLogProcessor{
+			cfg:           cfg,
+			logger:        logger,
+			logConditions: statements,
+		}, nil
+	}
+
 	var includeMatcher filterlog.Matcher
 	var excludeMatcher filterlog.Matcher
 
@@ -60,51 +80,65 @@ func newFilterLogsProcessor(logger *zap.Logger, cfg *Config) (*filterLogProcesso
 	}, nil
 }
 
-func (flp *filterLogProcessor) ProcessLogs(ctx context.Context, logs plog.Logs) (plog.Logs, error) {
+func (flp *filterLogProcessor) processLogs(ctx context.Context, logs plog.Logs) (plog.Logs, error) {
+	filteringLogs := flp.logConditions != nil
+
+	if filteringLogs {
+		var errors error
+		logs.ResourceLogs().RemoveIf(func(rlogs plog.ResourceLogs) bool {
+			rlogs.ScopeLogs().RemoveIf(func(slogs plog.ScopeLogs) bool {
+				slogs.LogRecords().RemoveIf(func(log plog.LogRecord) bool {
+					tCtx := ottllog.NewTransformContext(log, slogs.Scope(), rlogs.Resource())
+					metCondition, err := common.CheckConditions(ctx, tCtx, flp.logConditions)
+					if err != nil {
+						errors = multierr.Append(errors, err)
+					}
+					return metCondition
+				})
+				return slogs.LogRecords().Len() == 0
+			})
+			return rlogs.ScopeLogs().Len() == 0
+		})
+
+		if errors != nil {
+			return logs, errors
+		}
+		if logs.ResourceLogs().Len() == 0 {
+			return logs, processorhelper.ErrSkipProcessingData
+		}
+		return logs, nil
+	}
+
 	rLogs := logs.ResourceLogs()
 
 	// Filter out logs
-	flp.filterLogRecords(rLogs)
-
-	if rLogs.Len() == 0 {
-		return logs, processorhelper.ErrSkipProcessingData
-	}
-
-	return logs, nil
-}
-
-func (flp *filterLogProcessor) filterLogRecords(rLogs plog.ResourceLogsSlice) {
-	for i := 0; i < rLogs.Len(); i++ {
-		rLog := rLogs.At(i)
-		resource := rLog.Resource()
-		scopes := rLog.ScopeLogs()
-
-		for j := 0; j < scopes.Len(); j++ {
-			scope := scopes.At(j)
-			instrumentationScope := scope.Scope()
-			lrs := scope.LogRecords()
+	rLogs.RemoveIf(func(rl plog.ResourceLogs) bool {
+		resource := rl.Resource()
+		rl.ScopeLogs().RemoveIf(func(sl plog.ScopeLogs) bool {
+			scope := sl.Scope()
+			lrs := sl.LogRecords()
 
 			if flp.includeMatcher != nil {
 				// If includeMatcher exists, remove all records that do not match the filter.
 				lrs.RemoveIf(func(lr plog.LogRecord) bool {
-					return !flp.includeMatcher.MatchLogRecord(lr, resource, instrumentationScope)
+					return !flp.includeMatcher.MatchLogRecord(lr, resource, scope)
 				})
 			}
 
 			if flp.excludeMatcher != nil {
 				// If excludeMatcher exists, remove all records that match the filter.
 				lrs.RemoveIf(func(lr plog.LogRecord) bool {
-					return flp.excludeMatcher.MatchLogRecord(lr, resource, instrumentationScope)
+					return flp.excludeMatcher.MatchLogRecord(lr, resource, scope)
 				})
 			}
-		}
-
-		scopes.RemoveIf(func(sl plog.ScopeLogs) bool {
 			return sl.LogRecords().Len() == 0
 		})
-	}
-
-	rLogs.RemoveIf(func(rl plog.ResourceLogs) bool {
 		return rl.ScopeLogs().Len() == 0
 	})
+
+	if rLogs.Len() == 0 {
+		return logs, processorhelper.ErrSkipProcessingData
+	}
+
+	return logs, nil
 }
