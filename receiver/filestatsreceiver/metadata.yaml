@@ -2,8 +2,8 @@ type: filestats
 
 status:
   class: receiver
-  stability: development
-  pipelines: [metrics]
+  stability:
+    alpha: [metrics]
   distributions: [contrib]
 
 
