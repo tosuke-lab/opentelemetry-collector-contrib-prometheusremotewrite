@@ -48,7 +48,7 @@ func FromMetrics(md pmetric.Metrics, settings Settings) (tsMap map[string]*promp
 				mostRecentTimestamp = maxTimestamp(mostRecentTimestamp, mostRecentTimestampInMetric(metric))
 
 				if !isValidAggregationTemporality(metric) {
-					errs = multierr.Append(errs, errors.New("invalid temporality and type combination"))
+					errs = multierr.Append(errs, fmt.Errorf("invalid temporality and type combination for metric %q", metric.Name()))
 					continue
 				}
 
