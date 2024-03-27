@@ -22,6 +22,7 @@ import (
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/config"
 	"go.opentelemetry.io/collector/consumer"
+	"go.opentelemetry.io/collector/exporter"
 	"go.opentelemetry.io/collector/exporter/exporterhelper"
 	conventions "go.opentelemetry.io/collector/semconv/v1.6.1"
 
@@ -51,16 +52,16 @@ type baseLogsExporter struct {
 }
 
 // NewFactory creates a factory for Splunk HEC exporter.
-func NewFactory() component.ExporterFactory {
-	return component.NewExporterFactory(
+func NewFactory() exporter.Factory {
+	return exporter.NewFactory(
 		typeStr,
 		createDefaultConfig,
-		component.WithTracesExporter(createTracesExporter, stability),
-		component.WithMetricsExporter(createMetricsExporter, stability),
-		component.WithLogsExporter(createLogsExporter, stability))
+		exporter.WithTraces(createTracesExporter, stability),
+		exporter.WithMetrics(createMetricsExporter, stability),
+		exporter.WithLogs(createLogsExporter, stability))
 }
 
-func createDefaultConfig() component.ExporterConfig {
+func createDefaultConfig() component.Config {
 	return &Config{
 		LogDataEnabled:       true,
 		ProfilingDataEnabled: true,
@@ -84,16 +85,17 @@ func createDefaultConfig() component.ExporterConfig {
 		HecFields: OtelToHecFields{
 			SeverityText:   splunk.DefaultSeverityTextLabel,
 			SeverityNumber: splunk.DefaultSeverityNumberLabel,
-			Name:           splunk.DefaultNameLabel,
 		},
+		HealthPath:            splunk.DefaultHealthPath,
+		HecHealthCheckEnabled: false,
 	}
 }
 
 func createTracesExporter(
 	ctx context.Context,
-	set component.ExporterCreateSettings,
-	config component.ExporterConfig,
-) (component.TracesExporter, error) {
+	set exporter.CreateSettings,
+	config component.Config,
+) (exporter.Traces, error) {
 	if config == nil {
 		return nil, errors.New("nil config")
 	}
@@ -119,16 +121,15 @@ func createTracesExporter(
 
 func createMetricsExporter(
 	ctx context.Context,
-	set component.ExporterCreateSettings,
-	config component.ExporterConfig,
-) (component.MetricsExporter, error) {
+	set exporter.CreateSettings,
+	config component.Config,
+) (exporter.Metrics, error) {
 	if config == nil {
 		return nil, errors.New("nil config")
 	}
 	cfg := config.(*Config)
 
 	exp, err := createExporter(cfg, set.Logger, &set.BuildInfo)
-
 	if err != nil {
 		return nil, err
 	}
@@ -158,9 +159,9 @@ func createMetricsExporter(
 
 func createLogsExporter(
 	ctx context.Context,
-	set component.ExporterCreateSettings,
-	config component.ExporterConfig,
-) (exporter component.LogsExporter, err error) {
+	set exporter.CreateSettings,
+	config component.Config,
+) (exporter exporter.Logs, err error) {
 	if config == nil {
 		return nil, errors.New("nil config")
 	}

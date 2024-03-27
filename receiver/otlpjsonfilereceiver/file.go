@@ -24,6 +24,7 @@ import (
 	"go.opentelemetry.io/collector/pdata/plog"
 	"go.opentelemetry.io/collector/pdata/pmetric"
 	"go.opentelemetry.io/collector/pdata/ptrace"
+	rcvr "go.opentelemetry.io/collector/receiver"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/stanza/adapter"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/stanza/fileconsumer"
@@ -36,13 +37,13 @@ const (
 )
 
 // NewFactory creates a factory for file receiver
-func NewFactory() component.ReceiverFactory {
-	return component.NewReceiverFactory(
+func NewFactory() rcvr.Factory {
+	return rcvr.NewFactory(
 		typeStr,
 		createDefaultConfig,
-		component.WithMetricsReceiver(createMetricsReceiver, stability),
-		component.WithLogsReceiver(createLogsReceiver, stability),
-		component.WithTracesReceiver(createTracesReceiver, stability))
+		rcvr.WithMetrics(createMetricsReceiver, stability),
+		rcvr.WithLogs(createLogsReceiver, stability),
+		rcvr.WithTraces(createTracesReceiver, stability))
 }
 
 type Config struct {
@@ -51,7 +52,7 @@ type Config struct {
 	StorageID               *component.ID `mapstructure:"storage"`
 }
 
-func createDefaultConfig() component.ReceiverConfig {
+func createDefaultConfig() component.Config {
 	return &Config{
 		Config:           *fileconsumer.NewConfig(),
 		ReceiverSettings: config.NewReceiverSettings(component.NewID(typeStr)),
@@ -76,10 +77,10 @@ func (f *receiver) Shutdown(ctx context.Context) error {
 	return f.input.Stop()
 }
 
-func createLogsReceiver(_ context.Context, settings component.ReceiverCreateSettings, configuration component.ReceiverConfig, logs consumer.Logs) (component.LogsReceiver, error) {
+func createLogsReceiver(_ context.Context, settings rcvr.CreateSettings, configuration component.Config, logs consumer.Logs) (rcvr.Logs, error) {
 	logsUnmarshaler := &plog.JSONUnmarshaler{}
 	obsrecv, err := obsreport.NewReceiver(obsreport.ReceiverSettings{
-		ReceiverID:             configuration.ID(),
+		ReceiverID:             settings.ID,
 		Transport:              transport,
 		ReceiverCreateSettings: settings,
 	})
@@ -102,13 +103,13 @@ func createLogsReceiver(_ context.Context, settings component.ReceiverCreateSett
 		return nil, err
 	}
 
-	return &receiver{input: input, id: cfg.ID(), storageID: cfg.StorageID}, nil
+	return &receiver{input: input, id: settings.ID, storageID: cfg.StorageID}, nil
 }
 
-func createMetricsReceiver(_ context.Context, settings component.ReceiverCreateSettings, configuration component.ReceiverConfig, metrics consumer.Metrics) (component.MetricsReceiver, error) {
+func createMetricsReceiver(_ context.Context, settings rcvr.CreateSettings, configuration component.Config, metrics consumer.Metrics) (rcvr.Metrics, error) {
 	metricsUnmarshaler := &pmetric.JSONUnmarshaler{}
 	obsrecv, err := obsreport.NewReceiver(obsreport.ReceiverSettings{
-		ReceiverID:             configuration.ID(),
+		ReceiverID:             settings.ID,
 		Transport:              transport,
 		ReceiverCreateSettings: settings,
 	})
@@ -131,13 +132,13 @@ func createMetricsReceiver(_ context.Context, settings component.ReceiverCreateS
 		return nil, err
 	}
 
-	return &receiver{input: input, id: cfg.ID(), storageID: cfg.StorageID}, nil
+	return &receiver{input: input, id: settings.ID, storageID: cfg.StorageID}, nil
 }
 
-func createTracesReceiver(ctx context.Context, settings component.ReceiverCreateSettings, configuration component.ReceiverConfig, traces consumer.Traces) (component.TracesReceiver, error) {
+func createTracesReceiver(ctx context.Context, settings rcvr.CreateSettings, configuration component.Config, traces consumer.Traces) (rcvr.Traces, error) {
 	tracesUnmarshaler := &ptrace.JSONUnmarshaler{}
 	obsrecv, err := obsreport.NewReceiver(obsreport.ReceiverSettings{
-		ReceiverID:             configuration.ID(),
+		ReceiverID:             settings.ID,
 		Transport:              transport,
 		ReceiverCreateSettings: settings,
 	})
@@ -160,5 +161,5 @@ func createTracesReceiver(ctx context.Context, settings component.ReceiverCreate
 		return nil, err
 	}
 
-	return &receiver{input: input, id: cfg.ID(), storageID: cfg.StorageID}, nil
+	return &receiver{input: input, id: settings.ID, storageID: cfg.StorageID}, nil
 }

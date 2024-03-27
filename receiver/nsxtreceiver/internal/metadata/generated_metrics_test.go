@@ -7,15 +7,17 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/pmetric"
+	"go.opentelemetry.io/collector/receiver/receivertest"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest/observer"
 )
 
 func TestDefaultMetrics(t *testing.T) {
 	start := pcommon.Timestamp(1_000_000_000)
 	ts := pcommon.Timestamp(1_000_001_000)
-	mb := NewMetricsBuilder(DefaultMetricsSettings(), component.BuildInfo{}, WithStartTime(start))
+	mb := NewMetricsBuilder(DefaultMetricsSettings(), receivertest.NewNopCreateSettings(), WithStartTime(start))
 	enabledMetrics := make(map[string]bool)
 
 	enabledMetrics["nsxt.node.cpu.utilization"] = true
@@ -57,7 +59,7 @@ func TestDefaultMetrics(t *testing.T) {
 func TestAllMetrics(t *testing.T) {
 	start := pcommon.Timestamp(1_000_000_000)
 	ts := pcommon.Timestamp(1_000_001_000)
-	settings := MetricsSettings{
+	metricsSettings := MetricsSettings{
 		NsxtNodeCPUUtilization:        MetricSettings{Enabled: true},
 		NsxtNodeFilesystemUsage:       MetricSettings{Enabled: true},
 		NsxtNodeFilesystemUtilization: MetricSettings{Enabled: true},
@@ -66,7 +68,12 @@ func TestAllMetrics(t *testing.T) {
 		NsxtNodeNetworkIo:             MetricSettings{Enabled: true},
 		NsxtNodeNetworkPacketCount:    MetricSettings{Enabled: true},
 	}
-	mb := NewMetricsBuilder(settings, component.BuildInfo{}, WithStartTime(start))
+	observedZapCore, observedLogs := observer.New(zap.WarnLevel)
+	settings := receivertest.NewNopCreateSettings()
+	settings.Logger = zap.New(observedZapCore)
+	mb := NewMetricsBuilder(metricsSettings, settings, WithStartTime(start))
+
+	assert.Equal(t, 0, observedLogs.Len())
 
 	mb.RecordNsxtNodeCPUUtilizationDataPoint(ts, 1, AttributeClass(1))
 	mb.RecordNsxtNodeFilesystemUsageDataPoint(ts, 1, AttributeDiskState(1))
@@ -118,7 +125,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, float64(1), dp.DoubleValue())
 			attrVal, ok := dp.Attributes().Get("class")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeClass(1).String(), attrVal.Str())
+			assert.Equal(t, "datapath", attrVal.Str())
 			validatedMetrics["nsxt.node.cpu.utilization"] = struct{}{}
 		case "nsxt.node.filesystem.usage":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -134,7 +141,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, int64(1), dp.IntValue())
 			attrVal, ok := dp.Attributes().Get("state")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeDiskState(1).String(), attrVal.Str())
+			assert.Equal(t, "used", attrVal.Str())
 			validatedMetrics["nsxt.node.filesystem.usage"] = struct{}{}
 		case "nsxt.node.filesystem.utilization":
 			assert.Equal(t, pmetric.MetricTypeGauge, ms.At(i).Type())
@@ -187,7 +194,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, int64(1), dp.IntValue())
 			attrVal, ok := dp.Attributes().Get("direction")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeDirection(1).String(), attrVal.Str())
+			assert.Equal(t, "received", attrVal.Str())
 			validatedMetrics["nsxt.node.network.io"] = struct{}{}
 		case "nsxt.node.network.packet.count":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -203,10 +210,10 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, int64(1), dp.IntValue())
 			attrVal, ok := dp.Attributes().Get("direction")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeDirection(1).String(), attrVal.Str())
+			assert.Equal(t, "received", attrVal.Str())
 			attrVal, ok = dp.Attributes().Get("type")
 			assert.True(t, ok)
-			assert.Equal(t, AttributePacketType(1).String(), attrVal.Str())
+			assert.Equal(t, "dropped", attrVal.Str())
 			validatedMetrics["nsxt.node.network.packet.count"] = struct{}{}
 		}
 	}
@@ -216,7 +223,7 @@ func TestAllMetrics(t *testing.T) {
 func TestNoMetrics(t *testing.T) {
 	start := pcommon.Timestamp(1_000_000_000)
 	ts := pcommon.Timestamp(1_000_001_000)
-	settings := MetricsSettings{
+	metricsSettings := MetricsSettings{
 		NsxtNodeCPUUtilization:        MetricSettings{Enabled: false},
 		NsxtNodeFilesystemUsage:       MetricSettings{Enabled: false},
 		NsxtNodeFilesystemUtilization: MetricSettings{Enabled: false},
@@ -225,7 +232,12 @@ func TestNoMetrics(t *testing.T) {
 		NsxtNodeNetworkIo:             MetricSettings{Enabled: false},
 		NsxtNodeNetworkPacketCount:    MetricSettings{Enabled: false},
 	}
-	mb := NewMetricsBuilder(settings, component.BuildInfo{}, WithStartTime(start))
+	observedZapCore, observedLogs := observer.New(zap.WarnLevel)
+	settings := receivertest.NewNopCreateSettings()
+	settings.Logger = zap.New(observedZapCore)
+	mb := NewMetricsBuilder(metricsSettings, settings, WithStartTime(start))
+
+	assert.Equal(t, 0, observedLogs.Len())
 	mb.RecordNsxtNodeCPUUtilizationDataPoint(ts, 1, AttributeClass(1))
 	mb.RecordNsxtNodeFilesystemUsageDataPoint(ts, 1, AttributeDiskState(1))
 	mb.RecordNsxtNodeFilesystemUtilizationDataPoint(ts, 1)

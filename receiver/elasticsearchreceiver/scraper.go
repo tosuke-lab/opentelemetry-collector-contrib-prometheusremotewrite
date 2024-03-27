@@ -25,6 +25,7 @@ import (
 	"go.opentelemetry.io/collector/featuregate"
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/pmetric"
+	"go.opentelemetry.io/collector/receiver"
 	"go.opentelemetry.io/collector/receiver/scrapererror"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/elasticsearchreceiver/internal/metadata"
@@ -53,11 +54,13 @@ func init() {
 		emitClusterHealthDetailedShardMetricsID,
 		featuregate.StageAlpha,
 		featuregate.WithRegisterDescription("When enabled, the elasticsearch.cluster.shards metric will be emitted with two more datapoints."),
+		featuregate.WithRegisterReferenceURL("https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/14635"),
 	)
 	featuregate.GetRegistry().MustRegisterID(
 		emitAllIndexOperationMetricsID,
 		featuregate.StageAlpha,
 		featuregate.WithRegisterDescription("When enabled, the elasticsearch.index.operation.* metrics will be emitted with all possible datapoints."),
+		featuregate.WithRegisterReferenceURL("https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/14635"),
 	)
 }
 
@@ -77,13 +80,13 @@ type elasticsearchScraper struct {
 }
 
 func newElasticSearchScraper(
-	settings component.ReceiverCreateSettings,
+	settings receiver.CreateSettings,
 	cfg *Config,
 ) *elasticsearchScraper {
 	e := &elasticsearchScraper{
 		settings:                              settings.TelemetrySettings,
 		cfg:                                   cfg,
-		mb:                                    metadata.NewMetricsBuilder(cfg.Metrics, settings.BuildInfo),
+		mb:                                    metadata.NewMetricsBuilder(cfg.Metrics, settings),
 		emitClusterHealthDetailedShardMetrics: featuregate.GetRegistry().IsEnabled(emitClusterHealthDetailedShardMetricsID),
 		emitAllIndexOperationMetrics:          featuregate.GetRegistry().IsEnabled(emitAllIndexOperationMetricsID),
 	}
@@ -348,6 +351,34 @@ func (r *elasticsearchScraper) scrapeClusterMetrics(ctx context.Context, now pco
 		return
 	}
 
+	r.scrapeClusterHealthMetrics(ctx, now, errs)
+	r.scrapeClusterStatsMetrics(ctx, now, errs)
+
+	r.mb.EmitForResource(metadata.WithElasticsearchClusterName(r.clusterName))
+}
+
+func (r *elasticsearchScraper) scrapeClusterStatsMetrics(ctx context.Context, now pcommon.Timestamp, errs *scrapererror.ScrapeErrors) {
+	if len(r.cfg.Nodes) == 0 {
+		return
+	}
+
+	clusterStats, err := r.client.ClusterStats(ctx, r.cfg.Nodes)
+	if err != nil {
+		errs.AddPartial(3, err)
+		return
+	}
+
+	r.mb.RecordJvmMemoryHeapUsedDataPoint(now, clusterStats.NodesStats.JVMInfo.JVMMemoryInfo.HeapUsedInBy)
+
+	r.mb.RecordElasticsearchClusterIndicesCacheEvictionsDataPoint(
+		now, clusterStats.IndicesStats.FieldDataCache.Evictions, metadata.AttributeCacheNameFielddata,
+	)
+	r.mb.RecordElasticsearchClusterIndicesCacheEvictionsDataPoint(
+		now, clusterStats.IndicesStats.QueryCache.Evictions, metadata.AttributeCacheNameQuery,
+	)
+}
+
+func (r *elasticsearchScraper) scrapeClusterHealthMetrics(ctx context.Context, now pcommon.Timestamp, errs *scrapererror.ScrapeErrors) {
 	clusterHealth, err := r.client.ClusterHealth(ctx)
 	if err != nil {
 		errs.AddPartial(4, err)
@@ -387,8 +418,6 @@ func (r *elasticsearchScraper) scrapeClusterMetrics(ctx context.Context, now pco
 	default:
 		errs.AddPartial(1, fmt.Errorf("health status %s: %w", clusterHealth.Status, errUnknownClusterStatus))
 	}
-
-	r.mb.EmitForResource(metadata.WithElasticsearchClusterName(clusterHealth.ClusterName))
 }
 
 func (r *elasticsearchScraper) scrapeIndicesMetrics(ctx context.Context, now pcommon.Timestamp, errs *scrapererror.ScrapeErrors) {

@@ -20,6 +20,7 @@ import (
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/config"
 	"go.opentelemetry.io/collector/consumer"
+	"go.opentelemetry.io/collector/receiver"
 )
 
 const (
@@ -29,15 +30,15 @@ const (
 	stability = component.StabilityLevelBeta
 )
 
-// NewFactory return a new component.ReceiverFactory for fluentd forwarder.
-func NewFactory() component.ReceiverFactory {
-	return component.NewReceiverFactory(
+// NewFactory return a new receiver.Factory for fluentd forwarder.
+func NewFactory() receiver.Factory {
+	return receiver.NewFactory(
 		typeStr,
 		createDefaultConfig,
-		component.WithLogsReceiver(createLogsReceiver, stability))
+		receiver.WithLogs(createLogsReceiver, stability))
 }
 
-func createDefaultConfig() component.ReceiverConfig {
+func createDefaultConfig() component.Config {
 	return &Config{
 		ReceiverSettings: config.NewReceiverSettings(component.NewID(typeStr)),
 	}
@@ -45,10 +46,10 @@ func createDefaultConfig() component.ReceiverConfig {
 
 func createLogsReceiver(
 	_ context.Context,
-	params component.ReceiverCreateSettings,
-	cfg component.ReceiverConfig,
+	params receiver.CreateSettings,
+	cfg component.Config,
 	consumer consumer.Logs,
-) (component.LogsReceiver, error) {
+) (receiver.Logs, error) {
 
 	rCfg := cfg.(*Config)
 	return newFluentReceiver(params.Logger, rCfg, consumer)

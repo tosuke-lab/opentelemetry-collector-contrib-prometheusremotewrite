@@ -19,6 +19,7 @@ import (
 
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/config"
+	"go.opentelemetry.io/collector/exporter"
 )
 
 const (
@@ -29,15 +30,15 @@ const (
 )
 
 // NewFactory creates a factory for tencentcloud LogService exporter.
-func NewFactory() component.ExporterFactory {
-	return component.NewExporterFactory(
+func NewFactory() exporter.Factory {
+	return exporter.NewFactory(
 		typeStr,
 		createDefaultConfig,
-		component.WithLogsExporter(createLogsExporter, stability))
+		exporter.WithLogs(createLogsExporter, stability))
 }
 
 // CreateDefaultConfig creates the default configuration for exporter.
-func createDefaultConfig() component.ExporterConfig {
+func createDefaultConfig() component.Config {
 	return &Config{
 		ExporterSettings: config.NewExporterSettings(component.NewID(typeStr)),
 	}
@@ -45,8 +46,8 @@ func createDefaultConfig() component.ExporterConfig {
 
 func createLogsExporter(
 	_ context.Context,
-	set component.ExporterCreateSettings,
-	cfg component.ExporterConfig,
-) (exp component.LogsExporter, err error) {
+	set exporter.CreateSettings,
+	cfg component.Config,
+) (exp exporter.Logs, err error) {
 	return newLogsExporter(set, cfg)
 }

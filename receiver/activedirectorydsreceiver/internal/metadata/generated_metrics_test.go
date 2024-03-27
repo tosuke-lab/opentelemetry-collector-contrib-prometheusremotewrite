@@ -7,15 +7,17 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/pmetric"
+	"go.opentelemetry.io/collector/receiver/receivertest"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest/observer"
 )
 
 func TestDefaultMetrics(t *testing.T) {
 	start := pcommon.Timestamp(1_000_000_000)
 	ts := pcommon.Timestamp(1_000_001_000)
-	mb := NewMetricsBuilder(DefaultMetricsSettings(), component.BuildInfo{}, WithStartTime(start))
+	mb := NewMetricsBuilder(DefaultMetricsSettings(), receivertest.NewNopCreateSettings(), WithStartTime(start))
 	enabledMetrics := make(map[string]bool)
 
 	enabledMetrics["active_directory.ds.bind.rate"] = true
@@ -90,7 +92,7 @@ func TestDefaultMetrics(t *testing.T) {
 func TestAllMetrics(t *testing.T) {
 	start := pcommon.Timestamp(1_000_000_000)
 	ts := pcommon.Timestamp(1_000_001_000)
-	settings := MetricsSettings{
+	metricsSettings := MetricsSettings{
 		ActiveDirectoryDsBindRate:                                  MetricSettings{Enabled: true},
 		ActiveDirectoryDsLdapBindLastSuccessfulTime:                MetricSettings{Enabled: true},
 		ActiveDirectoryDsLdapBindRate:                              MetricSettings{Enabled: true},
@@ -110,7 +112,12 @@ func TestAllMetrics(t *testing.T) {
 		ActiveDirectoryDsSuboperationRate:                          MetricSettings{Enabled: true},
 		ActiveDirectoryDsThreadCount:                               MetricSettings{Enabled: true},
 	}
-	mb := NewMetricsBuilder(settings, component.BuildInfo{}, WithStartTime(start))
+	observedZapCore, observedLogs := observer.New(zap.WarnLevel)
+	settings := receivertest.NewNopCreateSettings()
+	settings.Logger = zap.New(observedZapCore)
+	mb := NewMetricsBuilder(metricsSettings, settings, WithStartTime(start))
+
+	assert.Equal(t, 0, observedLogs.Len())
 
 	mb.RecordActiveDirectoryDsBindRateDataPoint(ts, 1, AttributeBindType(1))
 	mb.RecordActiveDirectoryDsLdapBindLastSuccessfulTimeDataPoint(ts, 1)
@@ -159,7 +166,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, float64(1), dp.DoubleValue())
 			attrVal, ok := dp.Attributes().Get("type")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeBindType(1).String(), attrVal.Str())
+			assert.Equal(t, "server", attrVal.Str())
 			validatedMetrics["active_directory.ds.bind.rate"] = struct{}{}
 		case "active_directory.ds.ldap.bind.last_successful.time":
 			assert.Equal(t, pmetric.MetricTypeGauge, ms.At(i).Type())
@@ -249,7 +256,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, float64(1), dp.DoubleValue())
 			attrVal, ok := dp.Attributes().Get("type")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeOperationType(1).String(), attrVal.Str())
+			assert.Equal(t, "read", attrVal.Str())
 			validatedMetrics["active_directory.ds.operation.rate"] = struct{}{}
 		case "active_directory.ds.replication.network.io":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -265,10 +272,10 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, int64(1), dp.IntValue())
 			attrVal, ok := dp.Attributes().Get("direction")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeDirection(1).String(), attrVal.Str())
+			assert.Equal(t, "sent", attrVal.Str())
 			attrVal, ok = dp.Attributes().Get("type")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeNetworkDataType(1).String(), attrVal.Str())
+			assert.Equal(t, "compressed", attrVal.Str())
 			validatedMetrics["active_directory.ds.replication.network.io"] = struct{}{}
 		case "active_directory.ds.replication.object.rate":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -284,7 +291,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, float64(1), dp.DoubleValue())
 			attrVal, ok := dp.Attributes().Get("direction")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeDirection(1).String(), attrVal.Str())
+			assert.Equal(t, "sent", attrVal.Str())
 			validatedMetrics["active_directory.ds.replication.object.rate"] = struct{}{}
 		case "active_directory.ds.replication.operation.pending":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -313,7 +320,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, float64(1), dp.DoubleValue())
 			attrVal, ok := dp.Attributes().Get("direction")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeDirection(1).String(), attrVal.Str())
+			assert.Equal(t, "sent", attrVal.Str())
 			validatedMetrics["active_directory.ds.replication.property.rate"] = struct{}{}
 		case "active_directory.ds.replication.sync.object.pending":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -342,7 +349,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, int64(1), dp.IntValue())
 			attrVal, ok := dp.Attributes().Get("result")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeSyncResult(1).String(), attrVal.Str())
+			assert.Equal(t, "success", attrVal.Str())
 			validatedMetrics["active_directory.ds.replication.sync.request.count"] = struct{}{}
 		case "active_directory.ds.replication.value.rate":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -358,10 +365,10 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, float64(1), dp.DoubleValue())
 			attrVal, ok := dp.Attributes().Get("direction")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeDirection(1).String(), attrVal.Str())
+			assert.Equal(t, "sent", attrVal.Str())
 			attrVal, ok = dp.Attributes().Get("type")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeValueType(1).String(), attrVal.Str())
+			assert.Equal(t, "distingushed_names", attrVal.Str())
 			validatedMetrics["active_directory.ds.replication.value.rate"] = struct{}{}
 		case "active_directory.ds.security_descriptor_propagations_event.queued":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -390,7 +397,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, float64(1), dp.DoubleValue())
 			attrVal, ok := dp.Attributes().Get("type")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeSuboperationType(1).String(), attrVal.Str())
+			assert.Equal(t, "security_descriptor_propagations_event", attrVal.Str())
 			validatedMetrics["active_directory.ds.suboperation.rate"] = struct{}{}
 		case "active_directory.ds.thread.count":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -413,7 +420,7 @@ func TestAllMetrics(t *testing.T) {
 func TestNoMetrics(t *testing.T) {
 	start := pcommon.Timestamp(1_000_000_000)
 	ts := pcommon.Timestamp(1_000_001_000)
-	settings := MetricsSettings{
+	metricsSettings := MetricsSettings{
 		ActiveDirectoryDsBindRate:                                  MetricSettings{Enabled: false},
 		ActiveDirectoryDsLdapBindLastSuccessfulTime:                MetricSettings{Enabled: false},
 		ActiveDirectoryDsLdapBindRate:                              MetricSettings{Enabled: false},
@@ -433,7 +440,12 @@ func TestNoMetrics(t *testing.T) {
 		ActiveDirectoryDsSuboperationRate:                          MetricSettings{Enabled: false},
 		ActiveDirectoryDsThreadCount:                               MetricSettings{Enabled: false},
 	}
-	mb := NewMetricsBuilder(settings, component.BuildInfo{}, WithStartTime(start))
+	observedZapCore, observedLogs := observer.New(zap.WarnLevel)
+	settings := receivertest.NewNopCreateSettings()
+	settings.Logger = zap.New(observedZapCore)
+	mb := NewMetricsBuilder(metricsSettings, settings, WithStartTime(start))
+
+	assert.Equal(t, 0, observedLogs.Len())
 	mb.RecordActiveDirectoryDsBindRateDataPoint(ts, 1, AttributeBindType(1))
 	mb.RecordActiveDirectoryDsLdapBindLastSuccessfulTimeDataPoint(ts, 1)
 	mb.RecordActiveDirectoryDsLdapBindRateDataPoint(ts, 1)

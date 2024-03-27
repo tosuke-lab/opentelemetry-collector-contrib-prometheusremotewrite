@@ -27,6 +27,7 @@ import (
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/config/configtls"
 	"go.opentelemetry.io/collector/consumer"
+	"go.opentelemetry.io/collector/exporter"
 	"go.opentelemetry.io/collector/pdata/plog"
 	"go.opentelemetry.io/collector/pdata/pmetric"
 	"go.uber.org/zap"
@@ -50,7 +51,7 @@ type baseLogsExporter struct {
 }
 
 type signalfMetadataExporter struct {
-	component.MetricsExporter
+	exporter.Metrics
 	pushMetadata func(metadata []*metadata.MetadataUpdate) error
 }
 
@@ -88,8 +89,7 @@ func newSignalFxExporter(
 
 	options, err := config.getOptionsFromConfig()
 	if err != nil {
-		return nil,
-			fmt.Errorf("failed to process %q config: %w", config.ID().String(), err)
+		return nil, err
 	}
 
 	headers := buildHeaders(config)
@@ -183,7 +183,7 @@ func newEventExporter(config *Config, logger *zap.Logger) (*signalfxExporter, er
 	options, err := config.getOptionsFromConfig()
 	if err != nil {
 		return nil,
-			fmt.Errorf("failed to process %q config: %w", config.ID().String(), err)
+			fmt.Errorf("failed to process config: %w", err)
 	}
 
 	headers := buildHeaders(config)

@@ -7,15 +7,17 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/pmetric"
+	"go.opentelemetry.io/collector/receiver/receivertest"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest/observer"
 )
 
 func TestDefaultMetrics(t *testing.T) {
 	start := pcommon.Timestamp(1_000_000_000)
 	ts := pcommon.Timestamp(1_000_001_000)
-	mb := NewMetricsBuilder(DefaultMetricsSettings(), component.BuildInfo{}, WithStartTime(start))
+	mb := NewMetricsBuilder(DefaultMetricsSettings(), receivertest.NewNopCreateSettings(), WithStartTime(start))
 	enabledMetrics := make(map[string]bool)
 
 	enabledMetrics["bigip.node.availability"] = true
@@ -117,7 +119,7 @@ func TestDefaultMetrics(t *testing.T) {
 func TestAllMetrics(t *testing.T) {
 	start := pcommon.Timestamp(1_000_000_000)
 	ts := pcommon.Timestamp(1_000_001_000)
-	settings := MetricsSettings{
+	metricsSettings := MetricsSettings{
 		BigipNodeAvailability:             MetricSettings{Enabled: true},
 		BigipNodeConnectionCount:          MetricSettings{Enabled: true},
 		BigipNodeDataTransmitted:          MetricSettings{Enabled: true},
@@ -146,7 +148,12 @@ func TestAllMetrics(t *testing.T) {
 		BigipVirtualServerPacketCount:     MetricSettings{Enabled: true},
 		BigipVirtualServerRequestCount:    MetricSettings{Enabled: true},
 	}
-	mb := NewMetricsBuilder(settings, component.BuildInfo{}, WithStartTime(start))
+	observedZapCore, observedLogs := observer.New(zap.WarnLevel)
+	settings := receivertest.NewNopCreateSettings()
+	settings.Logger = zap.New(observedZapCore)
+	mb := NewMetricsBuilder(metricsSettings, settings, WithStartTime(start))
+
+	assert.Equal(t, 0, observedLogs.Len())
 
 	mb.RecordBigipNodeAvailabilityDataPoint(ts, 1, AttributeAvailabilityStatus(1))
 	mb.RecordBigipNodeConnectionCountDataPoint(ts, 1)
@@ -230,7 +237,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, int64(1), dp.IntValue())
 			attrVal, ok := dp.Attributes().Get("status")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeAvailabilityStatus(1).String(), attrVal.Str())
+			assert.Equal(t, "offline", attrVal.Str())
 			validatedMetrics["bigip.node.availability"] = struct{}{}
 		case "bigip.node.connection.count":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -259,7 +266,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, int64(1), dp.IntValue())
 			attrVal, ok := dp.Attributes().Get("direction")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeDirection(1).String(), attrVal.Str())
+			assert.Equal(t, "sent", attrVal.Str())
 			validatedMetrics["bigip.node.data.transmitted"] = struct{}{}
 		case "bigip.node.enabled":
 			assert.Equal(t, pmetric.MetricTypeGauge, ms.At(i).Type())
@@ -273,7 +280,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, int64(1), dp.IntValue())
 			attrVal, ok := dp.Attributes().Get("status")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeEnabledStatus(1).String(), attrVal.Str())
+			assert.Equal(t, "disabled", attrVal.Str())
 			validatedMetrics["bigip.node.enabled"] = struct{}{}
 		case "bigip.node.packet.count":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -289,7 +296,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, int64(1), dp.IntValue())
 			attrVal, ok := dp.Attributes().Get("direction")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeDirection(1).String(), attrVal.Str())
+			assert.Equal(t, "sent", attrVal.Str())
 			validatedMetrics["bigip.node.packet.count"] = struct{}{}
 		case "bigip.node.request.count":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -329,7 +336,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, int64(1), dp.IntValue())
 			attrVal, ok := dp.Attributes().Get("status")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeAvailabilityStatus(1).String(), attrVal.Str())
+			assert.Equal(t, "offline", attrVal.Str())
 			validatedMetrics["bigip.pool.availability"] = struct{}{}
 		case "bigip.pool.connection.count":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -358,7 +365,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, int64(1), dp.IntValue())
 			attrVal, ok := dp.Attributes().Get("direction")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeDirection(1).String(), attrVal.Str())
+			assert.Equal(t, "sent", attrVal.Str())
 			validatedMetrics["bigip.pool.data.transmitted"] = struct{}{}
 		case "bigip.pool.enabled":
 			assert.Equal(t, pmetric.MetricTypeGauge, ms.At(i).Type())
@@ -372,7 +379,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, int64(1), dp.IntValue())
 			attrVal, ok := dp.Attributes().Get("status")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeEnabledStatus(1).String(), attrVal.Str())
+			assert.Equal(t, "disabled", attrVal.Str())
 			validatedMetrics["bigip.pool.enabled"] = struct{}{}
 		case "bigip.pool.member.count":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -388,7 +395,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, int64(1), dp.IntValue())
 			attrVal, ok := dp.Attributes().Get("status")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeActiveStatus(1).String(), attrVal.Str())
+			assert.Equal(t, "active", attrVal.Str())
 			validatedMetrics["bigip.pool.member.count"] = struct{}{}
 		case "bigip.pool.packet.count":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -404,7 +411,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, int64(1), dp.IntValue())
 			attrVal, ok := dp.Attributes().Get("direction")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeDirection(1).String(), attrVal.Str())
+			assert.Equal(t, "sent", attrVal.Str())
 			validatedMetrics["bigip.pool.packet.count"] = struct{}{}
 		case "bigip.pool.request.count":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -431,7 +438,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, int64(1), dp.IntValue())
 			attrVal, ok := dp.Attributes().Get("status")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeAvailabilityStatus(1).String(), attrVal.Str())
+			assert.Equal(t, "offline", attrVal.Str())
 			validatedMetrics["bigip.pool_member.availability"] = struct{}{}
 		case "bigip.pool_member.connection.count":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -460,7 +467,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, int64(1), dp.IntValue())
 			attrVal, ok := dp.Attributes().Get("direction")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeDirection(1).String(), attrVal.Str())
+			assert.Equal(t, "sent", attrVal.Str())
 			validatedMetrics["bigip.pool_member.data.transmitted"] = struct{}{}
 		case "bigip.pool_member.enabled":
 			assert.Equal(t, pmetric.MetricTypeGauge, ms.At(i).Type())
@@ -474,7 +481,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, int64(1), dp.IntValue())
 			attrVal, ok := dp.Attributes().Get("status")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeEnabledStatus(1).String(), attrVal.Str())
+			assert.Equal(t, "disabled", attrVal.Str())
 			validatedMetrics["bigip.pool_member.enabled"] = struct{}{}
 		case "bigip.pool_member.packet.count":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -490,7 +497,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, int64(1), dp.IntValue())
 			attrVal, ok := dp.Attributes().Get("direction")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeDirection(1).String(), attrVal.Str())
+			assert.Equal(t, "sent", attrVal.Str())
 			validatedMetrics["bigip.pool_member.packet.count"] = struct{}{}
 		case "bigip.pool_member.request.count":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -530,7 +537,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, int64(1), dp.IntValue())
 			attrVal, ok := dp.Attributes().Get("status")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeAvailabilityStatus(1).String(), attrVal.Str())
+			assert.Equal(t, "offline", attrVal.Str())
 			validatedMetrics["bigip.virtual_server.availability"] = struct{}{}
 		case "bigip.virtual_server.connection.count":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -559,7 +566,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, int64(1), dp.IntValue())
 			attrVal, ok := dp.Attributes().Get("direction")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeDirection(1).String(), attrVal.Str())
+			assert.Equal(t, "sent", attrVal.Str())
 			validatedMetrics["bigip.virtual_server.data.transmitted"] = struct{}{}
 		case "bigip.virtual_server.enabled":
 			assert.Equal(t, pmetric.MetricTypeGauge, ms.At(i).Type())
@@ -573,7 +580,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, int64(1), dp.IntValue())
 			attrVal, ok := dp.Attributes().Get("status")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeEnabledStatus(1).String(), attrVal.Str())
+			assert.Equal(t, "disabled", attrVal.Str())
 			validatedMetrics["bigip.virtual_server.enabled"] = struct{}{}
 		case "bigip.virtual_server.packet.count":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -589,7 +596,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, int64(1), dp.IntValue())
 			attrVal, ok := dp.Attributes().Get("direction")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeDirection(1).String(), attrVal.Str())
+			assert.Equal(t, "sent", attrVal.Str())
 			validatedMetrics["bigip.virtual_server.packet.count"] = struct{}{}
 		case "bigip.virtual_server.request.count":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -612,7 +619,7 @@ func TestAllMetrics(t *testing.T) {
 func TestNoMetrics(t *testing.T) {
 	start := pcommon.Timestamp(1_000_000_000)
 	ts := pcommon.Timestamp(1_000_001_000)
-	settings := MetricsSettings{
+	metricsSettings := MetricsSettings{
 		BigipNodeAvailability:             MetricSettings{Enabled: false},
 		BigipNodeConnectionCount:          MetricSettings{Enabled: false},
 		BigipNodeDataTransmitted:          MetricSettings{Enabled: false},
@@ -641,7 +648,12 @@ func TestNoMetrics(t *testing.T) {
 		BigipVirtualServerPacketCount:     MetricSettings{Enabled: false},
 		BigipVirtualServerRequestCount:    MetricSettings{Enabled: false},
 	}
-	mb := NewMetricsBuilder(settings, component.BuildInfo{}, WithStartTime(start))
+	observedZapCore, observedLogs := observer.New(zap.WarnLevel)
+	settings := receivertest.NewNopCreateSettings()
+	settings.Logger = zap.New(observedZapCore)
+	mb := NewMetricsBuilder(metricsSettings, settings, WithStartTime(start))
+
+	assert.Equal(t, 0, observedLogs.Len())
 	mb.RecordBigipNodeAvailabilityDataPoint(ts, 1, AttributeAvailabilityStatus(1))
 	mb.RecordBigipNodeConnectionCountDataPoint(ts, 1)
 	mb.RecordBigipNodeDataTransmittedDataPoint(ts, 1, AttributeDirection(1))

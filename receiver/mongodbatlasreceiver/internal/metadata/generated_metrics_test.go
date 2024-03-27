@@ -7,15 +7,17 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/pmetric"
+	"go.opentelemetry.io/collector/receiver/receivertest"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest/observer"
 )
 
 func TestDefaultMetrics(t *testing.T) {
 	start := pcommon.Timestamp(1_000_000_000)
 	ts := pcommon.Timestamp(1_000_001_000)
-	mb := NewMetricsBuilder(DefaultMetricsSettings(), component.BuildInfo{}, WithStartTime(start))
+	mb := NewMetricsBuilder(DefaultMetricsSettings(), receivertest.NewNopCreateSettings(), WithStartTime(start))
 	enabledMetrics := make(map[string]bool)
 
 	enabledMetrics["mongodbatlas.db.counts"] = true
@@ -225,7 +227,7 @@ func TestDefaultMetrics(t *testing.T) {
 func TestAllMetrics(t *testing.T) {
 	start := pcommon.Timestamp(1_000_000_000)
 	ts := pcommon.Timestamp(1_000_001_000)
-	settings := MetricsSettings{
+	metricsSettings := MetricsSettings{
 		MongodbatlasDbCounts:                                  MetricSettings{Enabled: true},
 		MongodbatlasDbSize:                                    MetricSettings{Enabled: true},
 		MongodbatlasDiskPartitionIopsAverage:                  MetricSettings{Enabled: true},
@@ -290,7 +292,12 @@ func TestAllMetrics(t *testing.T) {
 		MongodbatlasSystemPagingUsageAverage:                  MetricSettings{Enabled: true},
 		MongodbatlasSystemPagingUsageMax:                      MetricSettings{Enabled: true},
 	}
-	mb := NewMetricsBuilder(settings, component.BuildInfo{}, WithStartTime(start))
+	observedZapCore, observedLogs := observer.New(zap.WarnLevel)
+	settings := receivertest.NewNopCreateSettings()
+	settings.Logger = zap.New(observedZapCore)
+	mb := NewMetricsBuilder(metricsSettings, settings, WithStartTime(start))
+
+	assert.Equal(t, 0, observedLogs.Len())
 
 	mb.RecordMongodbatlasDbCountsDataPoint(ts, 1, AttributeObjectType(1))
 	mb.RecordMongodbatlasDbSizeDataPoint(ts, 1, AttributeObjectType(1))
@@ -418,7 +425,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, float64(1), dp.DoubleValue())
 			attrVal, ok := dp.Attributes().Get("object_type")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeObjectType(1).String(), attrVal.Str())
+			assert.Equal(t, "collection", attrVal.Str())
 			validatedMetrics["mongodbatlas.db.counts"] = struct{}{}
 		case "mongodbatlas.db.size":
 			assert.Equal(t, pmetric.MetricTypeGauge, ms.At(i).Type())
@@ -432,7 +439,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, float64(1), dp.DoubleValue())
 			attrVal, ok := dp.Attributes().Get("object_type")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeObjectType(1).String(), attrVal.Str())
+			assert.Equal(t, "collection", attrVal.Str())
 			validatedMetrics["mongodbatlas.db.size"] = struct{}{}
 		case "mongodbatlas.disk.partition.iops.average":
 			assert.Equal(t, pmetric.MetricTypeGauge, ms.At(i).Type())
@@ -446,7 +453,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, float64(1), dp.DoubleValue())
 			attrVal, ok := dp.Attributes().Get("disk_direction")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeDiskDirection(1).String(), attrVal.Str())
+			assert.Equal(t, "read", attrVal.Str())
 			validatedMetrics["mongodbatlas.disk.partition.iops.average"] = struct{}{}
 		case "mongodbatlas.disk.partition.iops.max":
 			assert.Equal(t, pmetric.MetricTypeGauge, ms.At(i).Type())
@@ -460,7 +467,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, float64(1), dp.DoubleValue())
 			attrVal, ok := dp.Attributes().Get("disk_direction")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeDiskDirection(1).String(), attrVal.Str())
+			assert.Equal(t, "read", attrVal.Str())
 			validatedMetrics["mongodbatlas.disk.partition.iops.max"] = struct{}{}
 		case "mongodbatlas.disk.partition.latency.average":
 			assert.Equal(t, pmetric.MetricTypeGauge, ms.At(i).Type())
@@ -474,7 +481,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, float64(1), dp.DoubleValue())
 			attrVal, ok := dp.Attributes().Get("disk_direction")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeDiskDirection(1).String(), attrVal.Str())
+			assert.Equal(t, "read", attrVal.Str())
 			validatedMetrics["mongodbatlas.disk.partition.latency.average"] = struct{}{}
 		case "mongodbatlas.disk.partition.latency.max":
 			assert.Equal(t, pmetric.MetricTypeGauge, ms.At(i).Type())
@@ -488,7 +495,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, float64(1), dp.DoubleValue())
 			attrVal, ok := dp.Attributes().Get("disk_direction")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeDiskDirection(1).String(), attrVal.Str())
+			assert.Equal(t, "read", attrVal.Str())
 			validatedMetrics["mongodbatlas.disk.partition.latency.max"] = struct{}{}
 		case "mongodbatlas.disk.partition.space.average":
 			assert.Equal(t, pmetric.MetricTypeGauge, ms.At(i).Type())
@@ -502,7 +509,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, float64(1), dp.DoubleValue())
 			attrVal, ok := dp.Attributes().Get("disk_status")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeDiskStatus(1).String(), attrVal.Str())
+			assert.Equal(t, "free", attrVal.Str())
 			validatedMetrics["mongodbatlas.disk.partition.space.average"] = struct{}{}
 		case "mongodbatlas.disk.partition.space.max":
 			assert.Equal(t, pmetric.MetricTypeGauge, ms.At(i).Type())
@@ -516,7 +523,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, float64(1), dp.DoubleValue())
 			attrVal, ok := dp.Attributes().Get("disk_status")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeDiskStatus(1).String(), attrVal.Str())
+			assert.Equal(t, "free", attrVal.Str())
 			validatedMetrics["mongodbatlas.disk.partition.space.max"] = struct{}{}
 		case "mongodbatlas.disk.partition.usage.average":
 			assert.Equal(t, pmetric.MetricTypeGauge, ms.At(i).Type())
@@ -530,7 +537,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, float64(1), dp.DoubleValue())
 			attrVal, ok := dp.Attributes().Get("disk_status")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeDiskStatus(1).String(), attrVal.Str())
+			assert.Equal(t, "free", attrVal.Str())
 			validatedMetrics["mongodbatlas.disk.partition.usage.average"] = struct{}{}
 		case "mongodbatlas.disk.partition.usage.max":
 			assert.Equal(t, pmetric.MetricTypeGauge, ms.At(i).Type())
@@ -544,7 +551,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, float64(1), dp.DoubleValue())
 			attrVal, ok := dp.Attributes().Get("disk_status")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeDiskStatus(1).String(), attrVal.Str())
+			assert.Equal(t, "free", attrVal.Str())
 			validatedMetrics["mongodbatlas.disk.partition.usage.max"] = struct{}{}
 		case "mongodbatlas.disk.partition.utilization.average":
 			assert.Equal(t, pmetric.MetricTypeGauge, ms.At(i).Type())
@@ -558,7 +565,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, float64(1), dp.DoubleValue())
 			attrVal, ok := dp.Attributes().Get("disk_status")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeDiskStatus(1).String(), attrVal.Str())
+			assert.Equal(t, "free", attrVal.Str())
 			validatedMetrics["mongodbatlas.disk.partition.utilization.average"] = struct{}{}
 		case "mongodbatlas.disk.partition.utilization.max":
 			assert.Equal(t, pmetric.MetricTypeGauge, ms.At(i).Type())
@@ -572,7 +579,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, float64(1), dp.DoubleValue())
 			attrVal, ok := dp.Attributes().Get("disk_status")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeDiskStatus(1).String(), attrVal.Str())
+			assert.Equal(t, "free", attrVal.Str())
 			validatedMetrics["mongodbatlas.disk.partition.utilization.max"] = struct{}{}
 		case "mongodbatlas.process.asserts":
 			assert.Equal(t, pmetric.MetricTypeGauge, ms.At(i).Type())
@@ -586,7 +593,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, float64(1), dp.DoubleValue())
 			attrVal, ok := dp.Attributes().Get("assert_type")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeAssertType(1).String(), attrVal.Str())
+			assert.Equal(t, "regular", attrVal.Str())
 			validatedMetrics["mongodbatlas.process.asserts"] = struct{}{}
 		case "mongodbatlas.process.background_flush":
 			assert.Equal(t, pmetric.MetricTypeGauge, ms.At(i).Type())
@@ -611,7 +618,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, float64(1), dp.DoubleValue())
 			attrVal, ok := dp.Attributes().Get("cache_direction")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeCacheDirection(1).String(), attrVal.Str())
+			assert.Equal(t, "read_into", attrVal.Str())
 			validatedMetrics["mongodbatlas.process.cache.io"] = struct{}{}
 		case "mongodbatlas.process.cache.size":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -627,7 +634,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, float64(1), dp.DoubleValue())
 			attrVal, ok := dp.Attributes().Get("cache_status")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeCacheStatus(1).String(), attrVal.Str())
+			assert.Equal(t, "dirty", attrVal.Str())
 			validatedMetrics["mongodbatlas.process.cache.size"] = struct{}{}
 		case "mongodbatlas.process.connections":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -654,7 +661,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, float64(1), dp.DoubleValue())
 			attrVal, ok := dp.Attributes().Get("cpu_state")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeCPUState(1).String(), attrVal.Str())
+			assert.Equal(t, "kernel", attrVal.Str())
 			validatedMetrics["mongodbatlas.process.cpu.children.normalized.usage.average"] = struct{}{}
 		case "mongodbatlas.process.cpu.children.normalized.usage.max":
 			assert.Equal(t, pmetric.MetricTypeGauge, ms.At(i).Type())
@@ -668,7 +675,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, float64(1), dp.DoubleValue())
 			attrVal, ok := dp.Attributes().Get("cpu_state")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeCPUState(1).String(), attrVal.Str())
+			assert.Equal(t, "kernel", attrVal.Str())
 			validatedMetrics["mongodbatlas.process.cpu.children.normalized.usage.max"] = struct{}{}
 		case "mongodbatlas.process.cpu.children.usage.average":
 			assert.Equal(t, pmetric.MetricTypeGauge, ms.At(i).Type())
@@ -682,7 +689,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, float64(1), dp.DoubleValue())
 			attrVal, ok := dp.Attributes().Get("cpu_state")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeCPUState(1).String(), attrVal.Str())
+			assert.Equal(t, "kernel", attrVal.Str())
 			validatedMetrics["mongodbatlas.process.cpu.children.usage.average"] = struct{}{}
 		case "mongodbatlas.process.cpu.children.usage.max":
 			assert.Equal(t, pmetric.MetricTypeGauge, ms.At(i).Type())
@@ -696,7 +703,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, float64(1), dp.DoubleValue())
 			attrVal, ok := dp.Attributes().Get("cpu_state")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeCPUState(1).String(), attrVal.Str())
+			assert.Equal(t, "kernel", attrVal.Str())
 			validatedMetrics["mongodbatlas.process.cpu.children.usage.max"] = struct{}{}
 		case "mongodbatlas.process.cpu.normalized.usage.average":
 			assert.Equal(t, pmetric.MetricTypeGauge, ms.At(i).Type())
@@ -710,7 +717,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, float64(1), dp.DoubleValue())
 			attrVal, ok := dp.Attributes().Get("cpu_state")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeCPUState(1).String(), attrVal.Str())
+			assert.Equal(t, "kernel", attrVal.Str())
 			validatedMetrics["mongodbatlas.process.cpu.normalized.usage.average"] = struct{}{}
 		case "mongodbatlas.process.cpu.normalized.usage.max":
 			assert.Equal(t, pmetric.MetricTypeGauge, ms.At(i).Type())
@@ -724,7 +731,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, float64(1), dp.DoubleValue())
 			attrVal, ok := dp.Attributes().Get("cpu_state")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeCPUState(1).String(), attrVal.Str())
+			assert.Equal(t, "kernel", attrVal.Str())
 			validatedMetrics["mongodbatlas.process.cpu.normalized.usage.max"] = struct{}{}
 		case "mongodbatlas.process.cpu.usage.average":
 			assert.Equal(t, pmetric.MetricTypeGauge, ms.At(i).Type())
@@ -738,7 +745,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, float64(1), dp.DoubleValue())
 			attrVal, ok := dp.Attributes().Get("cpu_state")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeCPUState(1).String(), attrVal.Str())
+			assert.Equal(t, "kernel", attrVal.Str())
 			validatedMetrics["mongodbatlas.process.cpu.usage.average"] = struct{}{}
 		case "mongodbatlas.process.cpu.usage.max":
 			assert.Equal(t, pmetric.MetricTypeGauge, ms.At(i).Type())
@@ -752,7 +759,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, float64(1), dp.DoubleValue())
 			attrVal, ok := dp.Attributes().Get("cpu_state")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeCPUState(1).String(), attrVal.Str())
+			assert.Equal(t, "kernel", attrVal.Str())
 			validatedMetrics["mongodbatlas.process.cpu.usage.max"] = struct{}{}
 		case "mongodbatlas.process.cursors":
 			assert.Equal(t, pmetric.MetricTypeGauge, ms.At(i).Type())
@@ -766,7 +773,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, float64(1), dp.DoubleValue())
 			attrVal, ok := dp.Attributes().Get("cursor_state")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeCursorState(1).String(), attrVal.Str())
+			assert.Equal(t, "timed_out", attrVal.Str())
 			validatedMetrics["mongodbatlas.process.cursors"] = struct{}{}
 		case "mongodbatlas.process.db.document.rate":
 			assert.Equal(t, pmetric.MetricTypeGauge, ms.At(i).Type())
@@ -780,7 +787,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, float64(1), dp.DoubleValue())
 			attrVal, ok := dp.Attributes().Get("document_status")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeDocumentStatus(1).String(), attrVal.Str())
+			assert.Equal(t, "returned", attrVal.Str())
 			validatedMetrics["mongodbatlas.process.db.document.rate"] = struct{}{}
 		case "mongodbatlas.process.db.operations.rate":
 			assert.Equal(t, pmetric.MetricTypeGauge, ms.At(i).Type())
@@ -794,10 +801,10 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, float64(1), dp.DoubleValue())
 			attrVal, ok := dp.Attributes().Get("operation")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeOperation(1).String(), attrVal.Str())
+			assert.Equal(t, "cmd", attrVal.Str())
 			attrVal, ok = dp.Attributes().Get("cluster_role")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeClusterRole(1).String(), attrVal.Str())
+			assert.Equal(t, "primary", attrVal.Str())
 			validatedMetrics["mongodbatlas.process.db.operations.rate"] = struct{}{}
 		case "mongodbatlas.process.db.operations.time":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -813,7 +820,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, float64(1), dp.DoubleValue())
 			attrVal, ok := dp.Attributes().Get("execution_type")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeExecutionType(1).String(), attrVal.Str())
+			assert.Equal(t, "reads", attrVal.Str())
 			validatedMetrics["mongodbatlas.process.db.operations.time"] = struct{}{}
 		case "mongodbatlas.process.db.query_executor.scanned":
 			assert.Equal(t, pmetric.MetricTypeGauge, ms.At(i).Type())
@@ -827,7 +834,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, float64(1), dp.DoubleValue())
 			attrVal, ok := dp.Attributes().Get("scanned_type")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeScannedType(1).String(), attrVal.Str())
+			assert.Equal(t, "index_items", attrVal.Str())
 			validatedMetrics["mongodbatlas.process.db.query_executor.scanned"] = struct{}{}
 		case "mongodbatlas.process.db.query_targeting.scanned_per_returned":
 			assert.Equal(t, pmetric.MetricTypeGauge, ms.At(i).Type())
@@ -841,7 +848,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, float64(1), dp.DoubleValue())
 			attrVal, ok := dp.Attributes().Get("scanned_type")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeScannedType(1).String(), attrVal.Str())
+			assert.Equal(t, "index_items", attrVal.Str())
 			validatedMetrics["mongodbatlas.process.db.query_targeting.scanned_per_returned"] = struct{}{}
 		case "mongodbatlas.process.db.storage":
 			assert.Equal(t, pmetric.MetricTypeGauge, ms.At(i).Type())
@@ -855,7 +862,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, float64(1), dp.DoubleValue())
 			attrVal, ok := dp.Attributes().Get("storage_status")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeStorageStatus(1).String(), attrVal.Str())
+			assert.Equal(t, "total", attrVal.Str())
 			validatedMetrics["mongodbatlas.process.db.storage"] = struct{}{}
 		case "mongodbatlas.process.fts.cpu.usage":
 			assert.Equal(t, pmetric.MetricTypeGauge, ms.At(i).Type())
@@ -869,7 +876,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, float64(1), dp.DoubleValue())
 			attrVal, ok := dp.Attributes().Get("cpu_state")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeCPUState(1).String(), attrVal.Str())
+			assert.Equal(t, "kernel", attrVal.Str())
 			validatedMetrics["mongodbatlas.process.fts.cpu.usage"] = struct{}{}
 		case "mongodbatlas.process.global_lock":
 			assert.Equal(t, pmetric.MetricTypeGauge, ms.At(i).Type())
@@ -883,7 +890,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, float64(1), dp.DoubleValue())
 			attrVal, ok := dp.Attributes().Get("global_lock_state")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeGlobalLockState(1).String(), attrVal.Str())
+			assert.Equal(t, "current_queue_total", attrVal.Str())
 			validatedMetrics["mongodbatlas.process.global_lock"] = struct{}{}
 		case "mongodbatlas.process.index.btree_miss_ratio":
 			assert.Equal(t, pmetric.MetricTypeGauge, ms.At(i).Type())
@@ -908,7 +915,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, float64(1), dp.DoubleValue())
 			attrVal, ok := dp.Attributes().Get("btree_counter_type")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeBtreeCounterType(1).String(), attrVal.Str())
+			assert.Equal(t, "accesses", attrVal.Str())
 			validatedMetrics["mongodbatlas.process.index.counters"] = struct{}{}
 		case "mongodbatlas.process.journaling.commits":
 			assert.Equal(t, pmetric.MetricTypeGauge, ms.At(i).Type())
@@ -955,7 +962,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, float64(1), dp.DoubleValue())
 			attrVal, ok := dp.Attributes().Get("memory_state")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeMemoryState(1).String(), attrVal.Str())
+			assert.Equal(t, "resident", attrVal.Str())
 			validatedMetrics["mongodbatlas.process.memory.usage"] = struct{}{}
 		case "mongodbatlas.process.network.io":
 			assert.Equal(t, pmetric.MetricTypeGauge, ms.At(i).Type())
@@ -969,7 +976,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, float64(1), dp.DoubleValue())
 			attrVal, ok := dp.Attributes().Get("direction")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeDirection(1).String(), attrVal.Str())
+			assert.Equal(t, "receive", attrVal.Str())
 			validatedMetrics["mongodbatlas.process.network.io"] = struct{}{}
 		case "mongodbatlas.process.network.requests":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -1007,7 +1014,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, float64(1), dp.DoubleValue())
 			attrVal, ok := dp.Attributes().Get("oplog_type")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeOplogType(1).String(), attrVal.Str())
+			assert.Equal(t, "slave_lag_master_time", attrVal.Str())
 			validatedMetrics["mongodbatlas.process.oplog.time"] = struct{}{}
 		case "mongodbatlas.process.page_faults":
 			assert.Equal(t, pmetric.MetricTypeGauge, ms.At(i).Type())
@@ -1021,7 +1028,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, float64(1), dp.DoubleValue())
 			attrVal, ok := dp.Attributes().Get("memory_issue_type")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeMemoryIssueType(1).String(), attrVal.Str())
+			assert.Equal(t, "extra_info", attrVal.Str())
 			validatedMetrics["mongodbatlas.process.page_faults"] = struct{}{}
 		case "mongodbatlas.process.restarts":
 			assert.Equal(t, pmetric.MetricTypeGauge, ms.At(i).Type())
@@ -1046,7 +1053,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, float64(1), dp.DoubleValue())
 			attrVal, ok := dp.Attributes().Get("ticket_type")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeTicketType(1).String(), attrVal.Str())
+			assert.Equal(t, "available_reads", attrVal.Str())
 			validatedMetrics["mongodbatlas.process.tickets"] = struct{}{}
 		case "mongodbatlas.system.cpu.normalized.usage.average":
 			assert.Equal(t, pmetric.MetricTypeGauge, ms.At(i).Type())
@@ -1060,7 +1067,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, float64(1), dp.DoubleValue())
 			attrVal, ok := dp.Attributes().Get("cpu_state")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeCPUState(1).String(), attrVal.Str())
+			assert.Equal(t, "kernel", attrVal.Str())
 			validatedMetrics["mongodbatlas.system.cpu.normalized.usage.average"] = struct{}{}
 		case "mongodbatlas.system.cpu.normalized.usage.max":
 			assert.Equal(t, pmetric.MetricTypeGauge, ms.At(i).Type())
@@ -1074,7 +1081,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, float64(1), dp.DoubleValue())
 			attrVal, ok := dp.Attributes().Get("cpu_state")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeCPUState(1).String(), attrVal.Str())
+			assert.Equal(t, "kernel", attrVal.Str())
 			validatedMetrics["mongodbatlas.system.cpu.normalized.usage.max"] = struct{}{}
 		case "mongodbatlas.system.cpu.usage.average":
 			assert.Equal(t, pmetric.MetricTypeGauge, ms.At(i).Type())
@@ -1088,7 +1095,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, float64(1), dp.DoubleValue())
 			attrVal, ok := dp.Attributes().Get("cpu_state")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeCPUState(1).String(), attrVal.Str())
+			assert.Equal(t, "kernel", attrVal.Str())
 			validatedMetrics["mongodbatlas.system.cpu.usage.average"] = struct{}{}
 		case "mongodbatlas.system.cpu.usage.max":
 			assert.Equal(t, pmetric.MetricTypeGauge, ms.At(i).Type())
@@ -1102,7 +1109,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, float64(1), dp.DoubleValue())
 			attrVal, ok := dp.Attributes().Get("cpu_state")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeCPUState(1).String(), attrVal.Str())
+			assert.Equal(t, "kernel", attrVal.Str())
 			validatedMetrics["mongodbatlas.system.cpu.usage.max"] = struct{}{}
 		case "mongodbatlas.system.fts.cpu.normalized.usage":
 			assert.Equal(t, pmetric.MetricTypeGauge, ms.At(i).Type())
@@ -1116,7 +1123,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, float64(1), dp.DoubleValue())
 			attrVal, ok := dp.Attributes().Get("cpu_state")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeCPUState(1).String(), attrVal.Str())
+			assert.Equal(t, "kernel", attrVal.Str())
 			validatedMetrics["mongodbatlas.system.fts.cpu.normalized.usage"] = struct{}{}
 		case "mongodbatlas.system.fts.cpu.usage":
 			assert.Equal(t, pmetric.MetricTypeGauge, ms.At(i).Type())
@@ -1130,7 +1137,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, float64(1), dp.DoubleValue())
 			attrVal, ok := dp.Attributes().Get("cpu_state")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeCPUState(1).String(), attrVal.Str())
+			assert.Equal(t, "kernel", attrVal.Str())
 			validatedMetrics["mongodbatlas.system.fts.cpu.usage"] = struct{}{}
 		case "mongodbatlas.system.fts.disk.used":
 			assert.Equal(t, pmetric.MetricTypeGauge, ms.At(i).Type())
@@ -1157,7 +1164,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, float64(1), dp.DoubleValue())
 			attrVal, ok := dp.Attributes().Get("memory_state")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeMemoryState(1).String(), attrVal.Str())
+			assert.Equal(t, "resident", attrVal.Str())
 			validatedMetrics["mongodbatlas.system.fts.memory.usage"] = struct{}{}
 		case "mongodbatlas.system.memory.usage.average":
 			assert.Equal(t, pmetric.MetricTypeGauge, ms.At(i).Type())
@@ -1171,7 +1178,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, float64(1), dp.DoubleValue())
 			attrVal, ok := dp.Attributes().Get("memory_status")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeMemoryStatus(1).String(), attrVal.Str())
+			assert.Equal(t, "available", attrVal.Str())
 			validatedMetrics["mongodbatlas.system.memory.usage.average"] = struct{}{}
 		case "mongodbatlas.system.memory.usage.max":
 			assert.Equal(t, pmetric.MetricTypeGauge, ms.At(i).Type())
@@ -1185,7 +1192,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, float64(1), dp.DoubleValue())
 			attrVal, ok := dp.Attributes().Get("memory_status")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeMemoryStatus(1).String(), attrVal.Str())
+			assert.Equal(t, "available", attrVal.Str())
 			validatedMetrics["mongodbatlas.system.memory.usage.max"] = struct{}{}
 		case "mongodbatlas.system.network.io.average":
 			assert.Equal(t, pmetric.MetricTypeGauge, ms.At(i).Type())
@@ -1199,7 +1206,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, float64(1), dp.DoubleValue())
 			attrVal, ok := dp.Attributes().Get("direction")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeDirection(1).String(), attrVal.Str())
+			assert.Equal(t, "receive", attrVal.Str())
 			validatedMetrics["mongodbatlas.system.network.io.average"] = struct{}{}
 		case "mongodbatlas.system.network.io.max":
 			assert.Equal(t, pmetric.MetricTypeGauge, ms.At(i).Type())
@@ -1213,7 +1220,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, float64(1), dp.DoubleValue())
 			attrVal, ok := dp.Attributes().Get("direction")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeDirection(1).String(), attrVal.Str())
+			assert.Equal(t, "receive", attrVal.Str())
 			validatedMetrics["mongodbatlas.system.network.io.max"] = struct{}{}
 		case "mongodbatlas.system.paging.io.average":
 			assert.Equal(t, pmetric.MetricTypeGauge, ms.At(i).Type())
@@ -1227,7 +1234,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, float64(1), dp.DoubleValue())
 			attrVal, ok := dp.Attributes().Get("direction")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeDirection(1).String(), attrVal.Str())
+			assert.Equal(t, "receive", attrVal.Str())
 			validatedMetrics["mongodbatlas.system.paging.io.average"] = struct{}{}
 		case "mongodbatlas.system.paging.io.max":
 			assert.Equal(t, pmetric.MetricTypeGauge, ms.At(i).Type())
@@ -1241,7 +1248,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, float64(1), dp.DoubleValue())
 			attrVal, ok := dp.Attributes().Get("direction")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeDirection(1).String(), attrVal.Str())
+			assert.Equal(t, "receive", attrVal.Str())
 			validatedMetrics["mongodbatlas.system.paging.io.max"] = struct{}{}
 		case "mongodbatlas.system.paging.usage.average":
 			assert.Equal(t, pmetric.MetricTypeGauge, ms.At(i).Type())
@@ -1255,7 +1262,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, float64(1), dp.DoubleValue())
 			attrVal, ok := dp.Attributes().Get("memory_state")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeMemoryState(1).String(), attrVal.Str())
+			assert.Equal(t, "resident", attrVal.Str())
 			validatedMetrics["mongodbatlas.system.paging.usage.average"] = struct{}{}
 		case "mongodbatlas.system.paging.usage.max":
 			assert.Equal(t, pmetric.MetricTypeGauge, ms.At(i).Type())
@@ -1269,7 +1276,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, float64(1), dp.DoubleValue())
 			attrVal, ok := dp.Attributes().Get("memory_state")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeMemoryState(1).String(), attrVal.Str())
+			assert.Equal(t, "resident", attrVal.Str())
 			validatedMetrics["mongodbatlas.system.paging.usage.max"] = struct{}{}
 		}
 	}
@@ -1279,7 +1286,7 @@ func TestAllMetrics(t *testing.T) {
 func TestNoMetrics(t *testing.T) {
 	start := pcommon.Timestamp(1_000_000_000)
 	ts := pcommon.Timestamp(1_000_001_000)
-	settings := MetricsSettings{
+	metricsSettings := MetricsSettings{
 		MongodbatlasDbCounts:                                  MetricSettings{Enabled: false},
 		MongodbatlasDbSize:                                    MetricSettings{Enabled: false},
 		MongodbatlasDiskPartitionIopsAverage:                  MetricSettings{Enabled: false},
@@ -1344,7 +1351,12 @@ func TestNoMetrics(t *testing.T) {
 		MongodbatlasSystemPagingUsageAverage:                  MetricSettings{Enabled: false},
 		MongodbatlasSystemPagingUsageMax:                      MetricSettings{Enabled: false},
 	}
-	mb := NewMetricsBuilder(settings, component.BuildInfo{}, WithStartTime(start))
+	observedZapCore, observedLogs := observer.New(zap.WarnLevel)
+	settings := receivertest.NewNopCreateSettings()
+	settings.Logger = zap.New(observedZapCore)
+	mb := NewMetricsBuilder(metricsSettings, settings, WithStartTime(start))
+
+	assert.Equal(t, 0, observedLogs.Len())
 	mb.RecordMongodbatlasDbCountsDataPoint(ts, 1, AttributeObjectType(1))
 	mb.RecordMongodbatlasDbSizeDataPoint(ts, 1, AttributeObjectType(1))
 	mb.RecordMongodbatlasDiskPartitionIopsAverageDataPoint(ts, 1, AttributeDiskDirection(1))

@@ -23,6 +23,7 @@ import (
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/config"
 	"go.opentelemetry.io/collector/confmap"
+	"go.opentelemetry.io/collector/exporter"
 	"go.opentelemetry.io/collector/exporter/exporterhelper"
 	"go.uber.org/zap"
 	"gopkg.in/yaml.v2"
@@ -44,17 +45,17 @@ const (
 )
 
 // NewFactory creates a factory for SignalFx exporter.
-func NewFactory() component.ExporterFactory {
-	return component.NewExporterFactory(
+func NewFactory() exporter.Factory {
+	return exporter.NewFactory(
 		typeStr,
 		createDefaultConfig,
-		component.WithMetricsExporter(createMetricsExporter, stability),
-		component.WithLogsExporter(createLogsExporter, stability),
-		component.WithTracesExporter(createTracesExporter, stability),
+		exporter.WithMetrics(createMetricsExporter, stability),
+		exporter.WithLogs(createLogsExporter, stability),
+		exporter.WithTraces(createTracesExporter, stability),
 	)
 }
 
-func createDefaultConfig() component.ExporterConfig {
+func createDefaultConfig() component.Config {
 	return &Config{
 		ExporterSettings: config.NewExporterSettings(component.NewID(typeStr)),
 		TimeoutSettings:  exporterhelper.TimeoutSettings{Timeout: defaultHTTPTimeout},
@@ -72,9 +73,9 @@ func createDefaultConfig() component.ExporterConfig {
 
 func createTracesExporter(
 	ctx context.Context,
-	set component.ExporterCreateSettings,
-	eCfg component.ExporterConfig,
-) (component.TracesExporter, error) {
+	set exporter.CreateSettings,
+	eCfg component.Config,
+) (exporter.Traces, error) {
 	cfg := eCfg.(*Config)
 	corrCfg := cfg.Correlation
 
@@ -102,9 +103,9 @@ func createTracesExporter(
 
 func createMetricsExporter(
 	ctx context.Context,
-	set component.ExporterCreateSettings,
-	config component.ExporterConfig,
-) (component.MetricsExporter, error) {
+	set exporter.CreateSettings,
+	config component.Config,
+) (exporter.Metrics, error) {
 
 	cfg := config.(*Config)
 
@@ -142,8 +143,8 @@ func createMetricsExporter(
 	}
 
 	return &signalfMetadataExporter{
-		MetricsExporter: me,
-		pushMetadata:    exp.pushMetadata,
+		Metrics:      me,
+		pushMetadata: exp.pushMetadata,
 	}, nil
 }
 
@@ -185,9 +186,9 @@ func loadConfig(bytes []byte) (Config, error) {
 
 func createLogsExporter(
 	ctx context.Context,
-	set component.ExporterCreateSettings,
-	cfg component.ExporterConfig,
-) (component.LogsExporter, error) {
+	set exporter.CreateSettings,
+	cfg component.Config,
+) (exporter.Logs, error) {
 	expCfg := cfg.(*Config)
 
 	exp, err := newEventExporter(expCfg, set.Logger)

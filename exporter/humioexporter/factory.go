@@ -21,6 +21,7 @@ import (
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/config"
 	"go.opentelemetry.io/collector/config/confighttp"
+	"go.opentelemetry.io/collector/exporter"
 	"go.opentelemetry.io/collector/exporter/exporterhelper"
 )
 
@@ -32,16 +33,16 @@ const (
 )
 
 // NewFactory creates an exporter factory for Humio
-func NewFactory() component.ExporterFactory {
-	return component.NewExporterFactory(
+func NewFactory() exporter.Factory {
+	return exporter.NewFactory(
 		typeStr,
 		createDefaultConfig,
-		component.WithTracesExporter(createTracesExporter, stability),
+		exporter.WithTraces(createTracesExporter, stability),
 	)
 }
 
 // Provides a struct with default values for all relevant configuration settings
-func createDefaultConfig() component.ExporterConfig {
+func createDefaultConfig() component.Config {
 	return &Config{
 		ExporterSettings: config.NewExporterSettings(component.NewID(typeStr)),
 
@@ -65,9 +66,9 @@ func createDefaultConfig() component.ExporterConfig {
 // Creates a new trace exporter for Humio
 func createTracesExporter(
 	ctx context.Context,
-	set component.ExporterCreateSettings,
-	config component.ExporterConfig,
-) (component.TracesExporter, error) {
+	set exporter.CreateSettings,
+	config component.Config,
+) (exporter.Traces, error) {
 	if config == nil {
 		return nil, errors.New("missing config")
 	}

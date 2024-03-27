@@ -28,6 +28,7 @@ import (
 	"go.opentelemetry.io/collector/featuregate"
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/pmetric"
+	"go.opentelemetry.io/collector/receiver"
 	"go.opentelemetry.io/collector/receiver/scrapererror"
 	"go.uber.org/zap"
 
@@ -43,13 +44,15 @@ const (
 func init() {
 	featuregate.GetRegistry().MustRegisterID(
 		EmitServerNameAsResourceAttribute,
-		featuregate.StageAlpha,
+		featuregate.StageBeta,
 		featuregate.WithRegisterDescription("When enabled, the name of the server will be sent as an apache.server.name resource attribute instead of a metric-level server_name attribute."),
+		featuregate.WithRegisterReferenceURL("https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/14791"),
 	)
 	featuregate.GetRegistry().MustRegisterID(
 		EmitPortAsResourceAttribute,
-		featuregate.StageAlpha,
+		featuregate.StageBeta,
 		featuregate.WithRegisterDescription("When enabled, the port of the server will be sent as an apache.server.port resource attribute."),
+		featuregate.WithRegisterReferenceURL("https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/14791"),
 	)
 }
 
@@ -67,7 +70,7 @@ type apacheScraper struct {
 }
 
 func newApacheScraper(
-	settings component.ReceiverCreateSettings,
+	settings receiver.CreateSettings,
 	cfg *Config,
 	serverName string,
 	port string,
@@ -75,7 +78,7 @@ func newApacheScraper(
 	a := &apacheScraper{
 		settings:   settings.TelemetrySettings,
 		cfg:        cfg,
-		mb:         metadata.NewMetricsBuilder(cfg.Metrics, settings.BuildInfo),
+		mb:         metadata.NewMetricsBuilder(cfg.Metrics, settings),
 		serverName: serverName,
 		port:       port,
 		emitMetricsWithServerNameAsResourceAttribute: featuregate.GetRegistry().IsEnabled(EmitServerNameAsResourceAttribute),

@@ -7,21 +7,25 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/pmetric"
+	"go.opentelemetry.io/collector/receiver/receivertest"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest/observer"
 )
 
 func TestDefaultMetrics(t *testing.T) {
 	start := pcommon.Timestamp(1_000_000_000)
 	ts := pcommon.Timestamp(1_000_001_000)
-	mb := NewMetricsBuilder(DefaultMetricsSettings(), component.BuildInfo{}, WithStartTime(start))
+	mb := NewMetricsBuilder(DefaultMetricsSettings(), receivertest.NewNopCreateSettings(), WithStartTime(start))
 	enabledMetrics := make(map[string]bool)
 
 	mb.RecordProcessContextSwitchesDataPoint(ts, 1, AttributeContextSwitchType(1))
 
 	enabledMetrics["process.cpu.time"] = true
 	mb.RecordProcessCPUTimeDataPoint(ts, 1, AttributeState(1))
+
+	mb.RecordProcessCPUUtilizationDataPoint(ts, 1, AttributeState(1))
 
 	enabledMetrics["process.disk.io"] = true
 	mb.RecordProcessDiskIoDataPoint(ts, 1, AttributeDirection(1))
@@ -62,9 +66,10 @@ func TestDefaultMetrics(t *testing.T) {
 func TestAllMetrics(t *testing.T) {
 	start := pcommon.Timestamp(1_000_000_000)
 	ts := pcommon.Timestamp(1_000_001_000)
-	settings := MetricsSettings{
+	metricsSettings := MetricsSettings{
 		ProcessContextSwitches:     MetricSettings{Enabled: true},
 		ProcessCPUTime:             MetricSettings{Enabled: true},
+		ProcessCPUUtilization:      MetricSettings{Enabled: true},
 		ProcessDiskIo:              MetricSettings{Enabled: true},
 		ProcessMemoryPhysicalUsage: MetricSettings{Enabled: true},
 		ProcessMemoryUsage:         MetricSettings{Enabled: true},
@@ -75,10 +80,16 @@ func TestAllMetrics(t *testing.T) {
 		ProcessSignalsPending:      MetricSettings{Enabled: true},
 		ProcessThreads:             MetricSettings{Enabled: true},
 	}
-	mb := NewMetricsBuilder(settings, component.BuildInfo{}, WithStartTime(start))
+	observedZapCore, observedLogs := observer.New(zap.WarnLevel)
+	settings := receivertest.NewNopCreateSettings()
+	settings.Logger = zap.New(observedZapCore)
+	mb := NewMetricsBuilder(metricsSettings, settings, WithStartTime(start))
+
+	assert.Equal(t, 0+1+1, observedLogs.Len())
 
 	mb.RecordProcessContextSwitchesDataPoint(ts, 1, AttributeContextSwitchType(1))
 	mb.RecordProcessCPUTimeDataPoint(ts, 1, AttributeState(1))
+	mb.RecordProcessCPUUtilizationDataPoint(ts, 1, AttributeState(1))
 	mb.RecordProcessDiskIoDataPoint(ts, 1, AttributeDirection(1))
 	mb.RecordProcessMemoryPhysicalUsageDataPoint(ts, 1)
 	mb.RecordProcessMemoryUsageDataPoint(ts, 1)
@@ -145,7 +156,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, int64(1), dp.IntValue())
 			attrVal, ok := dp.Attributes().Get("type")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeContextSwitchType(1).String(), attrVal.Str())
+			assert.Equal(t, "involuntary", attrVal.Str())
 			validatedMetrics["process.context_switches"] = struct{}{}
 		case "process.cpu.time":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -161,8 +172,22 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, float64(1), dp.DoubleValue())
 			attrVal, ok := dp.Attributes().Get("state")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeState(1).String(), attrVal.Str())
+			assert.Equal(t, "system", attrVal.Str())
 			validatedMetrics["process.cpu.time"] = struct{}{}
+		case "process.cpu.utilization":
+			assert.Equal(t, pmetric.MetricTypeGauge, ms.At(i).Type())
+			assert.Equal(t, 1, ms.At(i).Gauge().DataPoints().Len())
+			assert.Equal(t, "Percentage of total CPU time used by the process since last scrape, expressed as a value between 0 and 1. On the first scrape, no data point is emitted for this metric.", ms.At(i).Description())
+			assert.Equal(t, "1", ms.At(i).Unit())
+			dp := ms.At(i).Gauge().DataPoints().At(0)
+			assert.Equal(t, start, dp.StartTimestamp())
+			assert.Equal(t, ts, dp.Timestamp())
+			assert.Equal(t, pmetric.NumberDataPointValueTypeDouble, dp.ValueType())
+			assert.Equal(t, float64(1), dp.DoubleValue())
+			attrVal, ok := dp.Attributes().Get("state")
+			assert.True(t, ok)
+			assert.Equal(t, "system", attrVal.Str())
+			validatedMetrics["process.cpu.utilization"] = struct{}{}
 		case "process.disk.io":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
 			assert.Equal(t, 1, ms.At(i).Sum().DataPoints().Len())
@@ -177,7 +202,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, int64(1), dp.IntValue())
 			attrVal, ok := dp.Attributes().Get("direction")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeDirection(1).String(), attrVal.Str())
+			assert.Equal(t, "read", attrVal.Str())
 			validatedMetrics["process.disk.io"] = struct{}{}
 		case "process.memory.physical_usage":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -258,7 +283,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, int64(1), dp.IntValue())
 			attrVal, ok := dp.Attributes().Get("type")
 			assert.True(t, ok)
-			assert.Equal(t, AttributePagingFaultType(1).String(), attrVal.Str())
+			assert.Equal(t, "major", attrVal.Str())
 			validatedMetrics["process.paging.faults"] = struct{}{}
 		case "process.signals_pending":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -294,9 +319,10 @@ func TestAllMetrics(t *testing.T) {
 func TestNoMetrics(t *testing.T) {
 	start := pcommon.Timestamp(1_000_000_000)
 	ts := pcommon.Timestamp(1_000_001_000)
-	settings := MetricsSettings{
+	metricsSettings := MetricsSettings{
 		ProcessContextSwitches:     MetricSettings{Enabled: false},
 		ProcessCPUTime:             MetricSettings{Enabled: false},
+		ProcessCPUUtilization:      MetricSettings{Enabled: false},
 		ProcessDiskIo:              MetricSettings{Enabled: false},
 		ProcessMemoryPhysicalUsage: MetricSettings{Enabled: false},
 		ProcessMemoryUsage:         MetricSettings{Enabled: false},
@@ -307,9 +333,15 @@ func TestNoMetrics(t *testing.T) {
 		ProcessSignalsPending:      MetricSettings{Enabled: false},
 		ProcessThreads:             MetricSettings{Enabled: false},
 	}
-	mb := NewMetricsBuilder(settings, component.BuildInfo{}, WithStartTime(start))
+	observedZapCore, observedLogs := observer.New(zap.WarnLevel)
+	settings := receivertest.NewNopCreateSettings()
+	settings.Logger = zap.New(observedZapCore)
+	mb := NewMetricsBuilder(metricsSettings, settings, WithStartTime(start))
+
+	assert.Equal(t, 0, observedLogs.Len())
 	mb.RecordProcessContextSwitchesDataPoint(ts, 1, AttributeContextSwitchType(1))
 	mb.RecordProcessCPUTimeDataPoint(ts, 1, AttributeState(1))
+	mb.RecordProcessCPUUtilizationDataPoint(ts, 1, AttributeState(1))
 	mb.RecordProcessDiskIoDataPoint(ts, 1, AttributeDirection(1))
 	mb.RecordProcessMemoryPhysicalUsageDataPoint(ts, 1)
 	mb.RecordProcessMemoryUsageDataPoint(ts, 1)

@@ -21,6 +21,7 @@ import (
 	"go.opentelemetry.io/collector/config"
 	"go.opentelemetry.io/collector/config/confighttp"
 	"go.opentelemetry.io/collector/consumer"
+	"go.opentelemetry.io/collector/receiver"
 )
 
 // This file implements factory for Zipkin receiver.
@@ -33,16 +34,16 @@ const (
 )
 
 // NewFactory creates a new Zipkin receiver factory
-func NewFactory() component.ReceiverFactory {
-	return component.NewReceiverFactory(
+func NewFactory() receiver.Factory {
+	return receiver.NewFactory(
 		typeStr,
 		createDefaultConfig,
-		component.WithTracesReceiver(createTracesReceiver, stability),
+		receiver.WithTraces(createTracesReceiver, stability),
 	)
 }
 
 // createDefaultConfig creates the default configuration for Zipkin receiver.
-func createDefaultConfig() component.ReceiverConfig {
+func createDefaultConfig() component.Config {
 	return &Config{
 		ReceiverSettings: config.NewReceiverSettings(component.NewID(typeStr)),
 		HTTPServerSettings: confighttp.HTTPServerSettings{
@@ -55,10 +56,10 @@ func createDefaultConfig() component.ReceiverConfig {
 // createTracesReceiver creates a trace receiver based on provided config.
 func createTracesReceiver(
 	_ context.Context,
-	set component.ReceiverCreateSettings,
-	cfg component.ReceiverConfig,
+	set receiver.CreateSettings,
+	cfg component.Config,
 	nextConsumer consumer.Traces,
-) (component.TracesReceiver, error) {
+) (receiver.Traces, error) {
 	rCfg := cfg.(*Config)
 	return newReceiver(rCfg, nextConsumer, set)
 }

@@ -7,15 +7,17 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/pmetric"
+	"go.opentelemetry.io/collector/receiver/receivertest"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest/observer"
 )
 
 func TestDefaultMetrics(t *testing.T) {
 	start := pcommon.Timestamp(1_000_000_000)
 	ts := pcommon.Timestamp(1_000_001_000)
-	mb := NewMetricsBuilder(DefaultMetricsSettings(), component.BuildInfo{}, WithStartTime(start))
+	mb := NewMetricsBuilder(DefaultMetricsSettings(), receivertest.NewNopCreateSettings(), WithStartTime(start))
 	enabledMetrics := make(map[string]bool)
 
 	enabledMetrics["postgresql.backends"] = true
@@ -102,7 +104,7 @@ func TestDefaultMetrics(t *testing.T) {
 func TestAllMetrics(t *testing.T) {
 	start := pcommon.Timestamp(1_000_000_000)
 	ts := pcommon.Timestamp(1_000_001_000)
-	settings := MetricsSettings{
+	metricsSettings := MetricsSettings{
 		PostgresqlBackends:                 MetricSettings{Enabled: true},
 		PostgresqlBgwriterBuffersAllocated: MetricSettings{Enabled: true},
 		PostgresqlBgwriterBuffersWrites:    MetricSettings{Enabled: true},
@@ -126,7 +128,12 @@ func TestAllMetrics(t *testing.T) {
 		PostgresqlWalAge:                   MetricSettings{Enabled: true},
 		PostgresqlWalLag:                   MetricSettings{Enabled: true},
 	}
-	mb := NewMetricsBuilder(settings, component.BuildInfo{}, WithStartTime(start))
+	observedZapCore, observedLogs := observer.New(zap.WarnLevel)
+	settings := receivertest.NewNopCreateSettings()
+	settings.Logger = zap.New(observedZapCore)
+	mb := NewMetricsBuilder(metricsSettings, settings, WithStartTime(start))
+
+	assert.Equal(t, 0, observedLogs.Len())
 
 	mb.RecordPostgresqlBackendsDataPoint(ts, 1, "attr-val")
 	mb.RecordPostgresqlBgwriterBuffersAllocatedDataPoint(ts, 1)
@@ -220,7 +227,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, int64(1), dp.IntValue())
 			attrVal, ok := dp.Attributes().Get("source")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeBgBufferSource(1).String(), attrVal.Str())
+			assert.Equal(t, "backend", attrVal.Str())
 			validatedMetrics["postgresql.bgwriter.buffers.writes"] = struct{}{}
 		case "postgresql.bgwriter.checkpoint.count":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -236,7 +243,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, int64(1), dp.IntValue())
 			attrVal, ok := dp.Attributes().Get("type")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeBgCheckpointType(1).String(), attrVal.Str())
+			assert.Equal(t, "requested", attrVal.Str())
 			validatedMetrics["postgresql.bgwriter.checkpoint.count"] = struct{}{}
 		case "postgresql.bgwriter.duration":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -252,7 +259,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, float64(1), dp.DoubleValue())
 			attrVal, ok := dp.Attributes().Get("type")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeBgDurationType(1).String(), attrVal.Str())
+			assert.Equal(t, "sync", attrVal.Str())
 			validatedMetrics["postgresql.bgwriter.duration"] = struct{}{}
 		case "postgresql.bgwriter.maxwritten":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -287,7 +294,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.EqualValues(t, "attr-val", attrVal.Str())
 			attrVal, ok = dp.Attributes().Get("source")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeSource(1).String(), attrVal.Str())
+			assert.Equal(t, "heap_read", attrVal.Str())
 			validatedMetrics["postgresql.blocks_read"] = struct{}{}
 		case "postgresql.commits":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -389,7 +396,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.EqualValues(t, "attr-val", attrVal.Str())
 			attrVal, ok = dp.Attributes().Get("operation")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeOperation(1).String(), attrVal.Str())
+			assert.Equal(t, "ins", attrVal.Str())
 			validatedMetrics["postgresql.operations"] = struct{}{}
 		case "postgresql.replication.data_delay":
 			assert.Equal(t, pmetric.MetricTypeGauge, ms.At(i).Type())
@@ -441,7 +448,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.EqualValues(t, "attr-val", attrVal.Str())
 			attrVal, ok = dp.Attributes().Get("state")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeState(1).String(), attrVal.Str())
+			assert.Equal(t, "dead", attrVal.Str())
 			validatedMetrics["postgresql.rows"] = struct{}{}
 		case "postgresql.table.count":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -505,7 +512,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, int64(1), dp.IntValue())
 			attrVal, ok := dp.Attributes().Get("operation")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeWalOperationLag(1).String(), attrVal.Str())
+			assert.Equal(t, "flush", attrVal.Str())
 			attrVal, ok = dp.Attributes().Get("replication_client")
 			assert.True(t, ok)
 			assert.EqualValues(t, "attr-val", attrVal.Str())
@@ -518,7 +525,7 @@ func TestAllMetrics(t *testing.T) {
 func TestNoMetrics(t *testing.T) {
 	start := pcommon.Timestamp(1_000_000_000)
 	ts := pcommon.Timestamp(1_000_001_000)
-	settings := MetricsSettings{
+	metricsSettings := MetricsSettings{
 		PostgresqlBackends:                 MetricSettings{Enabled: false},
 		PostgresqlBgwriterBuffersAllocated: MetricSettings{Enabled: false},
 		PostgresqlBgwriterBuffersWrites:    MetricSettings{Enabled: false},
@@ -542,7 +549,12 @@ func TestNoMetrics(t *testing.T) {
 		PostgresqlWalAge:                   MetricSettings{Enabled: false},
 		PostgresqlWalLag:                   MetricSettings{Enabled: false},
 	}
-	mb := NewMetricsBuilder(settings, component.BuildInfo{}, WithStartTime(start))
+	observedZapCore, observedLogs := observer.New(zap.WarnLevel)
+	settings := receivertest.NewNopCreateSettings()
+	settings.Logger = zap.New(observedZapCore)
+	mb := NewMetricsBuilder(metricsSettings, settings, WithStartTime(start))
+
+	assert.Equal(t, 0, observedLogs.Len())
 	mb.RecordPostgresqlBackendsDataPoint(ts, 1, "attr-val")
 	mb.RecordPostgresqlBgwriterBuffersAllocatedDataPoint(ts, 1)
 	mb.RecordPostgresqlBgwriterBuffersWritesDataPoint(ts, 1, AttributeBgBufferSource(1))

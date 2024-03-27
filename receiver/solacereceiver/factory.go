@@ -16,11 +16,13 @@ package solacereceiver // import "github.com/open-telemetry/opentelemetry-collec
 
 import (
 	"context"
+	"time"
 
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/config"
 	"go.opentelemetry.io/collector/config/configtls"
 	"go.opentelemetry.io/collector/consumer"
+	"go.opentelemetry.io/collector/receiver"
 )
 
 const (
@@ -35,16 +37,16 @@ const (
 )
 
 // NewFactory creates a factory for Solace receiver.
-func NewFactory() component.ReceiverFactory {
-	return component.NewReceiverFactory(
+func NewFactory() receiver.Factory {
+	return receiver.NewFactory(
 		componentType,
 		createDefaultConfig,
-		component.WithTracesReceiver(createTracesReceiver, stability),
+		receiver.WithTraces(createTracesReceiver, stability),
 	)
 }
 
 // createDefaultConfig creates the default configuration for receiver.
-func createDefaultConfig() component.ReceiverConfig {
+func createDefaultConfig() component.Config {
 	return &Config{
 		ReceiverSettings: config.NewReceiverSettings(component.NewID(componentType)),
 		Broker:           []string{defaultHost},
@@ -54,16 +56,21 @@ func createDefaultConfig() component.ReceiverConfig {
 			InsecureSkipVerify: false,
 			Insecure:           false,
 		},
+		Flow: FlowControl{
+			DelayedRetry: &FlowControlDelayedRetry{
+				Delay: 10 * time.Millisecond,
+			},
+		},
 	}
 }
 
 // CreateTracesReceiver creates a trace receiver based on provided config. Component is not shared
 func createTracesReceiver(
 	_ context.Context,
-	params component.ReceiverCreateSettings,
-	receiverConfig component.ReceiverConfig,
+	params receiver.CreateSettings,
+	receiverConfig component.Config,
 	nextConsumer consumer.Traces,
-) (component.TracesReceiver, error) {
+) (receiver.Traces, error) {
 	cfg, ok := receiverConfig.(*Config)
 	if !ok {
 		return nil, component.ErrDataTypeIsNotSupported

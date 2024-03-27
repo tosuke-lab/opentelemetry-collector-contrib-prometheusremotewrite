@@ -30,6 +30,7 @@ import (
 	"go.opentelemetry.io/collector/component/componenttest"
 	"go.opentelemetry.io/collector/config"
 	"go.opentelemetry.io/collector/exporter/exporterhelper"
+	"go.opentelemetry.io/collector/exporter/exportertest"
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/pmetric"
 	"go.uber.org/zap"
@@ -50,7 +51,7 @@ func TestCreateMetricsExporter(t *testing.T) {
 	c.AccessToken = "access_token"
 	c.Realm = "us0"
 
-	_, err := createMetricsExporter(context.Background(), componenttest.NewNopExporterCreateSettings(), cfg)
+	_, err := createMetricsExporter(context.Background(), exportertest.NewNopCreateSettings(), cfg)
 	assert.NoError(t, err)
 }
 
@@ -60,7 +61,7 @@ func TestCreateTracesExporter(t *testing.T) {
 	c.AccessToken = "access_token"
 	c.Realm = "us0"
 
-	_, err := createTracesExporter(context.Background(), componenttest.NewNopExporterCreateSettings(), cfg)
+	_, err := createTracesExporter(context.Background(), exportertest.NewNopCreateSettings(), cfg)
 	assert.NoError(t, err)
 }
 
@@ -69,7 +70,7 @@ func TestCreateTracesExporterNoAccessToken(t *testing.T) {
 	c := cfg.(*Config)
 	c.Realm = "us0"
 
-	_, err := createTracesExporter(context.Background(), componenttest.NewNopExporterCreateSettings(), cfg)
+	_, err := createTracesExporter(context.Background(), exportertest.NewNopCreateSettings(), cfg)
 	assert.EqualError(t, err, "access_token is required")
 }
 
@@ -83,7 +84,7 @@ func TestCreateInstanceViaFactory(t *testing.T) {
 
 	exp, err := factory.CreateMetricsExporter(
 		context.Background(),
-		componenttest.NewNopExporterCreateSettings(),
+		exportertest.NewNopCreateSettings(),
 		cfg)
 	assert.NoError(t, err)
 	assert.NotNil(t, exp)
@@ -94,14 +95,14 @@ func TestCreateInstanceViaFactory(t *testing.T) {
 	expCfg.Realm = "us1"
 	exp, err = factory.CreateMetricsExporter(
 		context.Background(),
-		componenttest.NewNopExporterCreateSettings(),
+		exportertest.NewNopCreateSettings(),
 		cfg)
 	assert.NoError(t, err)
 	require.NotNil(t, exp)
 
 	logExp, err := factory.CreateLogsExporter(
 		context.Background(),
-		componenttest.NewNopExporterCreateSettings(),
+		exportertest.NewNopCreateSettings(),
 		cfg)
 	assert.NoError(t, err)
 	require.NotNil(t, logExp)
@@ -121,7 +122,7 @@ func TestCreateMetricsExporter_CustomConfig(t *testing.T) {
 		TimeoutSettings: exporterhelper.TimeoutSettings{Timeout: 2 * time.Second},
 	}
 
-	te, err := createMetricsExporter(context.Background(), componenttest.NewNopExporterCreateSettings(), config)
+	te, err := createMetricsExporter(context.Background(), exportertest.NewNopCreateSettings(), config)
 	assert.NoError(t, err)
 	assert.NotNil(t, te)
 }
@@ -140,7 +141,7 @@ func TestFactory_CreateMetricsExporterFails(t *testing.T) {
 				Realm:            "lab",
 				TimeoutSettings:  exporterhelper.TimeoutSettings{Timeout: -2 * time.Second},
 			},
-			errorMessage: "failed to process \"signalfx\" config: cannot have a negative \"timeout\"",
+			errorMessage: "cannot have a negative \"timeout\"",
 		},
 		{
 			name: "empty_realm_and_urls",
@@ -148,8 +149,7 @@ func TestFactory_CreateMetricsExporterFails(t *testing.T) {
 				ExporterSettings: config.NewExporterSettings(component.NewID(typeStr)),
 				AccessToken:      "testToken",
 			},
-			errorMessage: "failed to process \"signalfx\" config: requires a non-empty \"realm\"," +
-				" or \"ingest_url\" and \"api_url\" should be explicitly set",
+			errorMessage: "requires a non-empty \"realm\", or \"ingest_url\" and \"api_url\" should be explicitly set",
 		},
 		{
 			name: "empty_realm_and_api_url",
@@ -158,8 +158,7 @@ func TestFactory_CreateMetricsExporterFails(t *testing.T) {
 				AccessToken:      "testToken",
 				IngestURL:        "http://localhost:123",
 			},
-			errorMessage: "failed to process \"signalfx\" config: requires a non-empty \"realm\"," +
-				" or \"ingest_url\" and \"api_url\" should be explicitly set",
+			errorMessage: "requires a non-empty \"realm\", or \"ingest_url\" and \"api_url\" should be explicitly set",
 		},
 		{
 			name: "negative_MaxConnections",
@@ -171,12 +170,12 @@ func TestFactory_CreateMetricsExporterFails(t *testing.T) {
 				APIURL:           "https://api.us1.signalfx.com/",
 				MaxConnections:   -10,
 			},
-			errorMessage: "failed to process \"signalfx\" config: cannot have a negative \"max_connections\"",
+			errorMessage: "cannot have a negative \"max_connections\"",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			te, err := createMetricsExporter(context.Background(), componenttest.NewNopExporterCreateSettings(), tt.config)
+			te, err := createMetricsExporter(context.Background(), exportertest.NewNopCreateSettings(), tt.config)
 			assert.EqualError(t, err, tt.errorMessage)
 			assert.Nil(t, te)
 		})
@@ -268,7 +267,7 @@ func TestCreateMetricsExporterWithDefaultExcludeMetrics(t *testing.T) {
 		Realm:            "us1",
 	}
 
-	te, err := createMetricsExporter(context.Background(), componenttest.NewNopExporterCreateSettings(), config)
+	te, err := createMetricsExporter(context.Background(), exportertest.NewNopCreateSettings(), config)
 	require.NoError(t, err)
 	require.NotNil(t, te)
 
@@ -288,7 +287,7 @@ func TestCreateMetricsExporterWithExcludeMetrics(t *testing.T) {
 		},
 	}
 
-	te, err := createMetricsExporter(context.Background(), componenttest.NewNopExporterCreateSettings(), config)
+	te, err := createMetricsExporter(context.Background(), exportertest.NewNopCreateSettings(), config)
 	require.NoError(t, err)
 	require.NotNil(t, te)
 
@@ -304,7 +303,7 @@ func TestCreateMetricsExporterWithEmptyExcludeMetrics(t *testing.T) {
 		ExcludeMetrics:   []dpfilters.MetricFilter{},
 	}
 
-	te, err := createMetricsExporter(context.Background(), componenttest.NewNopExporterCreateSettings(), config)
+	te, err := createMetricsExporter(context.Background(), exportertest.NewNopCreateSettings(), config)
 	require.NoError(t, err)
 	require.NotNil(t, te)
 

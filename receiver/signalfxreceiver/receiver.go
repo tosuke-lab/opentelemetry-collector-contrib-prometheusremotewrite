@@ -33,6 +33,7 @@ import (
 	"go.opentelemetry.io/collector/consumer"
 	"go.opentelemetry.io/collector/obsreport"
 	"go.opentelemetry.io/collector/pdata/plog"
+	"go.opentelemetry.io/collector/receiver"
 	conventions "go.opentelemetry.io/collector/semconv/v1.6.1"
 	"go.uber.org/zap"
 
@@ -78,9 +79,9 @@ var (
 	translator = &signalfx.ToTranslator{}
 )
 
-// sfxReceiver implements the component.MetricsReceiver for SignalFx metric protocol.
+// sfxReceiver implements the receiver.Metrics for SignalFx metric protocol.
 type sfxReceiver struct {
-	settings        component.ReceiverCreateSettings
+	settings        receiver.CreateSettings
 	config          *Config
 	metricsConsumer consumer.Metrics
 	logsConsumer    consumer.Logs
@@ -89,11 +90,11 @@ type sfxReceiver struct {
 	obsrecv         *obsreport.Receiver
 }
 
-var _ component.MetricsReceiver = (*sfxReceiver)(nil)
+var _ receiver.Metrics = (*sfxReceiver)(nil)
 
 // New creates the SignalFx receiver with the given configuration.
 func newReceiver(
-	settings component.ReceiverCreateSettings,
+	settings receiver.CreateSettings,
 	config Config,
 ) (*sfxReceiver, error) {
 	transport := "http"
@@ -101,7 +102,7 @@ func newReceiver(
 		transport = "https"
 	}
 	obsrecv, err := obsreport.NewReceiver(obsreport.ReceiverSettings{
-		ReceiverID:             config.ID(),
+		ReceiverID:             settings.ID,
 		Transport:              transport,
 		ReceiverCreateSettings: settings,
 	})
@@ -330,7 +331,7 @@ func (r *sfxReceiver) failRequest(
 			r.settings.Logger.Warn(
 				"Error writing HTTP response message",
 				zap.Error(writeErr),
-				zap.String("receiver", r.config.ID().String()))
+				zap.String("receiver", r.settings.ID.String()))
 		}
 	}
 

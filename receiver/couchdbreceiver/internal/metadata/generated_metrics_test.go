@@ -7,15 +7,17 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/pmetric"
+	"go.opentelemetry.io/collector/receiver/receivertest"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest/observer"
 )
 
 func TestDefaultMetrics(t *testing.T) {
 	start := pcommon.Timestamp(1_000_000_000)
 	ts := pcommon.Timestamp(1_000_001_000)
-	mb := NewMetricsBuilder(DefaultMetricsSettings(), component.BuildInfo{}, WithStartTime(start))
+	mb := NewMetricsBuilder(DefaultMetricsSettings(), receivertest.NewNopCreateSettings(), WithStartTime(start))
 	enabledMetrics := make(map[string]bool)
 
 	enabledMetrics["couchdb.average_request_time"] = true
@@ -60,7 +62,7 @@ func TestDefaultMetrics(t *testing.T) {
 func TestAllMetrics(t *testing.T) {
 	start := pcommon.Timestamp(1_000_000_000)
 	ts := pcommon.Timestamp(1_000_001_000)
-	settings := MetricsSettings{
+	metricsSettings := MetricsSettings{
 		CouchdbAverageRequestTime: MetricSettings{Enabled: true},
 		CouchdbDatabaseOpen:       MetricSettings{Enabled: true},
 		CouchdbDatabaseOperations: MetricSettings{Enabled: true},
@@ -70,7 +72,12 @@ func TestAllMetrics(t *testing.T) {
 		CouchdbHttpdResponses:     MetricSettings{Enabled: true},
 		CouchdbHttpdViews:         MetricSettings{Enabled: true},
 	}
-	mb := NewMetricsBuilder(settings, component.BuildInfo{}, WithStartTime(start))
+	observedZapCore, observedLogs := observer.New(zap.WarnLevel)
+	settings := receivertest.NewNopCreateSettings()
+	settings.Logger = zap.New(observedZapCore)
+	mb := NewMetricsBuilder(metricsSettings, settings, WithStartTime(start))
+
+	assert.Equal(t, 0, observedLogs.Len())
 
 	mb.RecordCouchdbAverageRequestTimeDataPoint(ts, 1)
 	mb.RecordCouchdbDatabaseOpenDataPoint(ts, 1)
@@ -137,7 +144,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, int64(1), dp.IntValue())
 			attrVal, ok := dp.Attributes().Get("operation")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeOperation(1).String(), attrVal.Str())
+			assert.Equal(t, "writes", attrVal.Str())
 			validatedMetrics["couchdb.database.operations"] = struct{}{}
 		case "couchdb.file_descriptor.open":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -179,7 +186,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, int64(1), dp.IntValue())
 			attrVal, ok := dp.Attributes().Get("http.method")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeHTTPMethod(1).String(), attrVal.Str())
+			assert.Equal(t, "COPY", attrVal.Str())
 			validatedMetrics["couchdb.httpd.requests"] = struct{}{}
 		case "couchdb.httpd.responses":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -211,7 +218,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, int64(1), dp.IntValue())
 			attrVal, ok := dp.Attributes().Get("view")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeView(1).String(), attrVal.Str())
+			assert.Equal(t, "temporary_view_reads", attrVal.Str())
 			validatedMetrics["couchdb.httpd.views"] = struct{}{}
 		}
 	}
@@ -221,7 +228,7 @@ func TestAllMetrics(t *testing.T) {
 func TestNoMetrics(t *testing.T) {
 	start := pcommon.Timestamp(1_000_000_000)
 	ts := pcommon.Timestamp(1_000_001_000)
-	settings := MetricsSettings{
+	metricsSettings := MetricsSettings{
 		CouchdbAverageRequestTime: MetricSettings{Enabled: false},
 		CouchdbDatabaseOpen:       MetricSettings{Enabled: false},
 		CouchdbDatabaseOperations: MetricSettings{Enabled: false},
@@ -231,7 +238,12 @@ func TestNoMetrics(t *testing.T) {
 		CouchdbHttpdResponses:     MetricSettings{Enabled: false},
 		CouchdbHttpdViews:         MetricSettings{Enabled: false},
 	}
-	mb := NewMetricsBuilder(settings, component.BuildInfo{}, WithStartTime(start))
+	observedZapCore, observedLogs := observer.New(zap.WarnLevel)
+	settings := receivertest.NewNopCreateSettings()
+	settings.Logger = zap.New(observedZapCore)
+	mb := NewMetricsBuilder(metricsSettings, settings, WithStartTime(start))
+
+	assert.Equal(t, 0, observedLogs.Len())
 	mb.RecordCouchdbAverageRequestTimeDataPoint(ts, 1)
 	mb.RecordCouchdbDatabaseOpenDataPoint(ts, 1)
 	mb.RecordCouchdbDatabaseOperationsDataPoint(ts, 1, AttributeOperation(1))

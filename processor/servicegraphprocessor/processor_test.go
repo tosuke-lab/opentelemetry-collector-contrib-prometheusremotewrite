@@ -27,6 +27,8 @@ import (
 	"go.opentelemetry.io/collector/config/configgrpc"
 	"go.opentelemetry.io/collector/consumer"
 	"go.opentelemetry.io/collector/consumer/consumertest"
+	"go.opentelemetry.io/collector/exporter"
+	"go.opentelemetry.io/collector/exporter/exportertest"
 	"go.opentelemetry.io/collector/exporter/otlpexporter"
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/pmetric"
@@ -37,7 +39,7 @@ import (
 
 func TestProcessorStart(t *testing.T) {
 	// Create otlp exporters.
-	otlpConfig, mexp, texp := newOTLPExporters(t)
+	otlpID, mexp, texp := newOTLPExporters(t)
 
 	for _, tc := range []struct {
 		name            string
@@ -53,7 +55,7 @@ func TestProcessorStart(t *testing.T) {
 			// Prepare
 			exporters := map[component.DataType]map[component.ID]component.Component{
 				component.DataTypeMetrics: {
-					otlpConfig.ID(): tc.exporter,
+					otlpID: tc.exporter,
 				},
 			}
 
@@ -225,20 +227,21 @@ func sampleTraces() ptrace.Traces {
 	return traces
 }
 
-func newOTLPExporters(t *testing.T) (*otlpexporter.Config, component.MetricsExporter, component.TracesExporter) {
+func newOTLPExporters(t *testing.T) (component.ID, exporter.Metrics, exporter.Traces) {
 	otlpExpFactory := otlpexporter.NewFactory()
+	otlpID := component.NewID("otlp")
 	otlpConfig := &otlpexporter.Config{
-		ExporterSettings: config.NewExporterSettings(component.NewID("otlp")),
+		ExporterSettings: config.NewExporterSettings(otlpID),
 		GRPCClientSettings: configgrpc.GRPCClientSettings{
 			Endpoint: "example.com:1234",
 		},
 	}
-	expCreationParams := componenttest.NewNopExporterCreateSettings()
+	expCreationParams := exportertest.NewNopCreateSettings()
 	mexp, err := otlpExpFactory.CreateMetricsExporter(context.Background(), expCreationParams, otlpConfig)
 	require.NoError(t, err)
 	texp, err := otlpExpFactory.CreateTracesExporter(context.Background(), expCreationParams, otlpConfig)
 	require.NoError(t, err)
-	return otlpConfig, mexp, texp
+	return otlpID, mexp, texp
 }
 
 type mockHost struct {
@@ -257,9 +260,9 @@ func (m *mockHost) GetExporters() map[component.DataType]map[component.ID]compon
 	return m.exps
 }
 
-var _ component.MetricsExporter = (*mockMetricsExporter)(nil)
+var _ exporter.Metrics = (*mockMetricsExporter)(nil)
 
-func newMockMetricsExporter(verifyFunc func(md pmetric.Metrics) error) component.MetricsExporter {
+func newMockMetricsExporter(verifyFunc func(md pmetric.Metrics) error) exporter.Metrics {
 	return &mockMetricsExporter{verify: verifyFunc}
 }
 
@@ -275,4 +278,44 @@ func (m *mockMetricsExporter) Capabilities() consumer.Capabilities { return cons
 
 func (m *mockMetricsExporter) ConsumeMetrics(_ context.Context, md pmetric.Metrics) error {
 	return m.verify(md)
+}
+
+func TestUpdateDurationMetrics(t *testing.T) {
+	p := processor{
+		reqTotal:                       make(map[string]int64),
+		reqFailedTotal:                 make(map[string]int64),
+		reqDurationSecondsSum:          make(map[string]float64),
+		reqDurationSecondsCount:        make(map[string]uint64),
+		reqDurationBounds:              defaultLatencyHistogramBucketsMs,
+		reqDurationSecondsBucketCounts: make(map[string][]uint64),
+		keyToMetric:                    make(map[string]metricSeries),
+		config: &Config{
+			Dimensions: []string{},
+		},
+	}
+	metricKey := p.buildMetricKey("foo", "bar", "", map[string]string{})
+
+	testCases := []struct {
+		caseStr  string
+		duration float64
+	}{
+
+		{
+			caseStr:  "index 0 latency",
+			duration: 0,
+		},
+		{
+			caseStr:  "out-of-range latency 1",
+			duration: 25_000,
+		},
+		{
+			caseStr:  "out-of-range latency 2",
+			duration: 125_000,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.caseStr, func(t *testing.T) {
+			p.updateDurationMetrics(metricKey, tc.duration)
+		})
+	}
 }

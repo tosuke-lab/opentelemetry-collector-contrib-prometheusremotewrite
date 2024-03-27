@@ -7,15 +7,17 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/pmetric"
+	"go.opentelemetry.io/collector/receiver/receivertest"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest/observer"
 )
 
 func TestDefaultMetrics(t *testing.T) {
 	start := pcommon.Timestamp(1_000_000_000)
 	ts := pcommon.Timestamp(1_000_001_000)
-	mb := NewMetricsBuilder(DefaultMetricsSettings(), component.BuildInfo{}, WithStartTime(start))
+	mb := NewMetricsBuilder(DefaultMetricsSettings(), receivertest.NewNopCreateSettings(), WithStartTime(start))
 	enabledMetrics := make(map[string]bool)
 
 	enabledMetrics["riak.memory.limit"] = true
@@ -54,7 +56,7 @@ func TestDefaultMetrics(t *testing.T) {
 func TestAllMetrics(t *testing.T) {
 	start := pcommon.Timestamp(1_000_000_000)
 	ts := pcommon.Timestamp(1_000_001_000)
-	settings := MetricsSettings{
+	metricsSettings := MetricsSettings{
 		RiakMemoryLimit:              MetricSettings{Enabled: true},
 		RiakNodeOperationCount:       MetricSettings{Enabled: true},
 		RiakNodeOperationTimeMean:    MetricSettings{Enabled: true},
@@ -62,7 +64,12 @@ func TestAllMetrics(t *testing.T) {
 		RiakVnodeIndexOperationCount: MetricSettings{Enabled: true},
 		RiakVnodeOperationCount:      MetricSettings{Enabled: true},
 	}
-	mb := NewMetricsBuilder(settings, component.BuildInfo{}, WithStartTime(start))
+	observedZapCore, observedLogs := observer.New(zap.WarnLevel)
+	settings := receivertest.NewNopCreateSettings()
+	settings.Logger = zap.New(observedZapCore)
+	mb := NewMetricsBuilder(metricsSettings, settings, WithStartTime(start))
+
+	assert.Equal(t, 0, observedLogs.Len())
 
 	mb.RecordRiakMemoryLimitDataPoint(ts, 1)
 	mb.RecordRiakNodeOperationCountDataPoint(ts, 1, AttributeRequest(1))
@@ -116,7 +123,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, int64(1), dp.IntValue())
 			attrVal, ok := dp.Attributes().Get("request")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeRequest(1).String(), attrVal.Str())
+			assert.Equal(t, "put", attrVal.Str())
 			validatedMetrics["riak.node.operation.count"] = struct{}{}
 		case "riak.node.operation.time.mean":
 			assert.Equal(t, pmetric.MetricTypeGauge, ms.At(i).Type())
@@ -130,7 +137,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, int64(1), dp.IntValue())
 			attrVal, ok := dp.Attributes().Get("request")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeRequest(1).String(), attrVal.Str())
+			assert.Equal(t, "put", attrVal.Str())
 			validatedMetrics["riak.node.operation.time.mean"] = struct{}{}
 		case "riak.node.read_repair.count":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -159,7 +166,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, int64(1), dp.IntValue())
 			attrVal, ok := dp.Attributes().Get("operation")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeOperation(1).String(), attrVal.Str())
+			assert.Equal(t, "read", attrVal.Str())
 			validatedMetrics["riak.vnode.index.operation.count"] = struct{}{}
 		case "riak.vnode.operation.count":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -175,7 +182,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, int64(1), dp.IntValue())
 			attrVal, ok := dp.Attributes().Get("request")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeRequest(1).String(), attrVal.Str())
+			assert.Equal(t, "put", attrVal.Str())
 			validatedMetrics["riak.vnode.operation.count"] = struct{}{}
 		}
 	}
@@ -185,7 +192,7 @@ func TestAllMetrics(t *testing.T) {
 func TestNoMetrics(t *testing.T) {
 	start := pcommon.Timestamp(1_000_000_000)
 	ts := pcommon.Timestamp(1_000_001_000)
-	settings := MetricsSettings{
+	metricsSettings := MetricsSettings{
 		RiakMemoryLimit:              MetricSettings{Enabled: false},
 		RiakNodeOperationCount:       MetricSettings{Enabled: false},
 		RiakNodeOperationTimeMean:    MetricSettings{Enabled: false},
@@ -193,7 +200,12 @@ func TestNoMetrics(t *testing.T) {
 		RiakVnodeIndexOperationCount: MetricSettings{Enabled: false},
 		RiakVnodeOperationCount:      MetricSettings{Enabled: false},
 	}
-	mb := NewMetricsBuilder(settings, component.BuildInfo{}, WithStartTime(start))
+	observedZapCore, observedLogs := observer.New(zap.WarnLevel)
+	settings := receivertest.NewNopCreateSettings()
+	settings.Logger = zap.New(observedZapCore)
+	mb := NewMetricsBuilder(metricsSettings, settings, WithStartTime(start))
+
+	assert.Equal(t, 0, observedLogs.Len())
 	mb.RecordRiakMemoryLimitDataPoint(ts, 1)
 	mb.RecordRiakNodeOperationCountDataPoint(ts, 1, AttributeRequest(1))
 	mb.RecordRiakNodeOperationTimeMeanDataPoint(ts, 1, AttributeRequest(1))

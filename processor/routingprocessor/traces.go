@@ -19,6 +19,7 @@ import (
 
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/consumer"
+	"go.opentelemetry.io/collector/exporter"
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/ptrace"
 	"go.uber.org/multierr"
@@ -35,16 +36,16 @@ type tracesProcessor struct {
 	config *Config
 
 	extractor extractor
-	router    router[component.TracesExporter, ottlspan.TransformContext]
+	router    router[exporter.Traces, ottlspan.TransformContext]
 }
 
-func newTracesProcessor(settings component.TelemetrySettings, config component.ProcessorConfig) *tracesProcessor {
+func newTracesProcessor(settings component.TelemetrySettings, config component.Config) *tracesProcessor {
 	cfg := rewriteRoutingEntriesToOTTL(config.(*Config))
 
 	return &tracesProcessor{
 		logger: settings.Logger,
 		config: cfg,
-		router: newRouter[component.TracesExporter, ottlspan.TransformContext](
+		router: newRouter[exporter.Traces, ottlspan.TransformContext](
 			cfg.Table,
 			cfg.DefaultExporters,
 			settings,
@@ -79,7 +80,7 @@ func (p *tracesProcessor) ConsumeTraces(ctx context.Context, t ptrace.Traces) er
 }
 
 type spanGroup struct {
-	exporters []component.TracesExporter
+	exporters []exporter.Traces
 	traces    ptrace.Traces
 }
 
@@ -125,7 +126,7 @@ func (p *tracesProcessor) route(ctx context.Context, t ptrace.Traces) error {
 	return errs
 }
 
-func (p *tracesProcessor) group(key string, groups map[string]spanGroup, exporters []component.TracesExporter, spans ptrace.ResourceSpans) {
+func (p *tracesProcessor) group(key string, groups map[string]spanGroup, exporters []exporter.Traces, spans ptrace.ResourceSpans) {
 	group, ok := groups[key]
 	if !ok {
 		group.traces = ptrace.NewTraces()

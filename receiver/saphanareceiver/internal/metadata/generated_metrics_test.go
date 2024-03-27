@@ -7,15 +7,17 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/pmetric"
+	"go.opentelemetry.io/collector/receiver/receivertest"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest/observer"
 )
 
 func TestDefaultMetrics(t *testing.T) {
 	start := pcommon.Timestamp(1_000_000_000)
 	ts := pcommon.Timestamp(1_000_001_000)
-	mb := NewMetricsBuilder(DefaultMetricsSettings(), component.BuildInfo{}, WithStartTime(start))
+	mb := NewMetricsBuilder(DefaultMetricsSettings(), receivertest.NewNopCreateSettings(), WithStartTime(start))
 	enabledMetrics := make(map[string]bool)
 
 	enabledMetrics["saphana.alert.count"] = true
@@ -171,7 +173,7 @@ func TestDefaultMetrics(t *testing.T) {
 func TestAllMetrics(t *testing.T) {
 	start := pcommon.Timestamp(1_000_000_000)
 	ts := pcommon.Timestamp(1_000_001_000)
-	settings := MetricsSettings{
+	metricsSettings := MetricsSettings{
 		SaphanaAlertCount:                       MetricSettings{Enabled: true},
 		SaphanaBackupLatest:                     MetricSettings{Enabled: true},
 		SaphanaColumnMemoryUsed:                 MetricSettings{Enabled: true},
@@ -218,7 +220,12 @@ func TestAllMetrics(t *testing.T) {
 		SaphanaVolumeOperationSize:              MetricSettings{Enabled: true},
 		SaphanaVolumeOperationTime:              MetricSettings{Enabled: true},
 	}
-	mb := NewMetricsBuilder(settings, component.BuildInfo{}, WithStartTime(start))
+	observedZapCore, observedLogs := observer.New(zap.WarnLevel)
+	settings := receivertest.NewNopCreateSettings()
+	settings.Logger = zap.New(observedZapCore)
+	mb := NewMetricsBuilder(metricsSettings, settings, WithStartTime(start))
+
+	assert.Equal(t, 0, observedLogs.Len())
 
 	mb.RecordSaphanaAlertCountDataPoint(ts, "1", "attr-val")
 	mb.RecordSaphanaBackupLatestDataPoint(ts, "1")
@@ -329,10 +336,10 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, int64(1), dp.IntValue())
 			attrVal, ok := dp.Attributes().Get("type")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeColumnMemoryType(1).String(), attrVal.Str())
+			assert.Equal(t, "main", attrVal.Str())
 			attrVal, ok = dp.Attributes().Get("subtype")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeColumnMemorySubtype(1).String(), attrVal.Str())
+			assert.Equal(t, "data", attrVal.Str())
 			validatedMetrics["saphana.column.memory.used"] = struct{}{}
 		case "saphana.component.memory.used":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -364,7 +371,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, int64(1), dp.IntValue())
 			attrVal, ok := dp.Attributes().Get("status")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeConnectionStatus(1).String(), attrVal.Str())
+			assert.Equal(t, "running", attrVal.Str())
 			validatedMetrics["saphana.connection.count"] = struct{}{}
 		case "saphana.cpu.used":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -380,7 +387,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, int64(1), dp.IntValue())
 			attrVal, ok := dp.Attributes().Get("type")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeCPUType(1).String(), attrVal.Str())
+			assert.Equal(t, "user", attrVal.Str())
 			validatedMetrics["saphana.cpu.used"] = struct{}{}
 		case "saphana.disk.size.current":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -402,7 +409,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.EqualValues(t, "attr-val", attrVal.Str())
 			attrVal, ok = dp.Attributes().Get("state")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeDiskStateUsedFree(1).String(), attrVal.Str())
+			assert.Equal(t, "used", attrVal.Str())
 			validatedMetrics["saphana.disk.size.current"] = struct{}{}
 		case "saphana.host.memory.current":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -418,7 +425,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, int64(1), dp.IntValue())
 			attrVal, ok := dp.Attributes().Get("state")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeMemoryStateUsedFree(1).String(), attrVal.Str())
+			assert.Equal(t, "used", attrVal.Str())
 			validatedMetrics["saphana.host.memory.current"] = struct{}{}
 		case "saphana.host.swap.current":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -434,7 +441,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, int64(1), dp.IntValue())
 			attrVal, ok := dp.Attributes().Get("state")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeHostSwapState(1).String(), attrVal.Str())
+			assert.Equal(t, "used", attrVal.Str())
 			validatedMetrics["saphana.host.swap.current"] = struct{}{}
 		case "saphana.instance.code_size":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -463,7 +470,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, int64(1), dp.IntValue())
 			attrVal, ok := dp.Attributes().Get("state")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeMemoryStateUsedFree(1).String(), attrVal.Str())
+			assert.Equal(t, "used", attrVal.Str())
 			validatedMetrics["saphana.instance.memory.current"] = struct{}{}
 		case "saphana.instance.memory.shared.allocated":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -571,7 +578,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, int64(1), dp.IntValue())
 			attrVal, ok := dp.Attributes().Get("state")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeActivePendingRequestState(1).String(), attrVal.Str())
+			assert.Equal(t, "active", attrVal.Str())
 			validatedMetrics["saphana.network.request.count"] = struct{}{}
 		case "saphana.network.request.finished.count":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -587,7 +594,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, int64(1), dp.IntValue())
 			attrVal, ok := dp.Attributes().Get("type")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeInternalExternalRequestType(1).String(), attrVal.Str())
+			assert.Equal(t, "internal", attrVal.Str())
 			validatedMetrics["saphana.network.request.finished.count"] = struct{}{}
 		case "saphana.replication.average_time":
 			assert.Equal(t, pmetric.MetricTypeGauge, ms.At(i).Type())
@@ -676,7 +683,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, int64(1), dp.IntValue())
 			attrVal, ok := dp.Attributes().Get("type")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeRowMemoryType(1).String(), attrVal.Str())
+			assert.Equal(t, "fixed", attrVal.Str())
 			validatedMetrics["saphana.row_store.memory.used"] = struct{}{}
 		case "saphana.schema.memory.used.current":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -695,7 +702,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.EqualValues(t, "attr-val", attrVal.Str())
 			attrVal, ok = dp.Attributes().Get("type")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeSchemaMemoryType(1).String(), attrVal.Str())
+			assert.Equal(t, "main", attrVal.Str())
 			validatedMetrics["saphana.schema.memory.used.current"] = struct{}{}
 		case "saphana.schema.memory.used.max":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -730,7 +737,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.EqualValues(t, "attr-val", attrVal.Str())
 			attrVal, ok = dp.Attributes().Get("type")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeSchemaOperationType(1).String(), attrVal.Str())
+			assert.Equal(t, "read", attrVal.Str())
 			validatedMetrics["saphana.schema.operation.count"] = struct{}{}
 		case "saphana.schema.record.compressed.count":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -765,7 +772,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.EqualValues(t, "attr-val", attrVal.Str())
 			attrVal, ok = dp.Attributes().Get("type")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeSchemaRecordType(1).String(), attrVal.Str())
+			assert.Equal(t, "main", attrVal.Str())
 			validatedMetrics["saphana.schema.record.count"] = struct{}{}
 		case "saphana.service.code_size":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -797,7 +804,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, int64(1), dp.IntValue())
 			attrVal, ok := dp.Attributes().Get("status")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeServiceStatus(1).String(), attrVal.Str())
+			assert.Equal(t, "active", attrVal.Str())
 			validatedMetrics["saphana.service.count"] = struct{}{}
 		case "saphana.service.memory.compactors.allocated":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -864,7 +871,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.EqualValues(t, "attr-val", attrVal.Str())
 			attrVal, ok = dp.Attributes().Get("state")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeMemoryStateUsedFree(1).String(), attrVal.Str())
+			assert.Equal(t, "used", attrVal.Str())
 			validatedMetrics["saphana.service.memory.heap.current"] = struct{}{}
 		case "saphana.service.memory.limit":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -899,7 +906,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.EqualValues(t, "attr-val", attrVal.Str())
 			attrVal, ok = dp.Attributes().Get("state")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeMemoryStateUsedFree(1).String(), attrVal.Str())
+			assert.Equal(t, "used", attrVal.Str())
 			validatedMetrics["saphana.service.memory.shared.current"] = struct{}{}
 		case "saphana.service.memory.used":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -918,7 +925,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.EqualValues(t, "attr-val", attrVal.Str())
 			attrVal, ok = dp.Attributes().Get("type")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeServiceMemoryUsedType(1).String(), attrVal.Str())
+			assert.Equal(t, "logical", attrVal.Str())
 			validatedMetrics["saphana.service.memory.used"] = struct{}{}
 		case "saphana.service.stack_size":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -950,7 +957,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, int64(1), dp.IntValue())
 			attrVal, ok := dp.Attributes().Get("status")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeThreadStatus(1).String(), attrVal.Str())
+			assert.Equal(t, "active", attrVal.Str())
 			validatedMetrics["saphana.service.thread.count"] = struct{}{}
 		case "saphana.transaction.blocked":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -979,7 +986,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, int64(1), dp.IntValue())
 			attrVal, ok := dp.Attributes().Get("type")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeTransactionType(1).String(), attrVal.Str())
+			assert.Equal(t, "update", attrVal.Str())
 			validatedMetrics["saphana.transaction.count"] = struct{}{}
 		case "saphana.uptime":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -1020,7 +1027,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.EqualValues(t, "attr-val", attrVal.Str())
 			attrVal, ok = dp.Attributes().Get("type")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeVolumeOperationType(1).String(), attrVal.Str())
+			assert.Equal(t, "read", attrVal.Str())
 			validatedMetrics["saphana.volume.operation.count"] = struct{}{}
 		case "saphana.volume.operation.size":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -1042,7 +1049,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.EqualValues(t, "attr-val", attrVal.Str())
 			attrVal, ok = dp.Attributes().Get("type")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeVolumeOperationType(1).String(), attrVal.Str())
+			assert.Equal(t, "read", attrVal.Str())
 			validatedMetrics["saphana.volume.operation.size"] = struct{}{}
 		case "saphana.volume.operation.time":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -1064,7 +1071,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.EqualValues(t, "attr-val", attrVal.Str())
 			attrVal, ok = dp.Attributes().Get("type")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeVolumeOperationType(1).String(), attrVal.Str())
+			assert.Equal(t, "read", attrVal.Str())
 			validatedMetrics["saphana.volume.operation.time"] = struct{}{}
 		}
 	}
@@ -1074,7 +1081,7 @@ func TestAllMetrics(t *testing.T) {
 func TestNoMetrics(t *testing.T) {
 	start := pcommon.Timestamp(1_000_000_000)
 	ts := pcommon.Timestamp(1_000_001_000)
-	settings := MetricsSettings{
+	metricsSettings := MetricsSettings{
 		SaphanaAlertCount:                       MetricSettings{Enabled: false},
 		SaphanaBackupLatest:                     MetricSettings{Enabled: false},
 		SaphanaColumnMemoryUsed:                 MetricSettings{Enabled: false},
@@ -1121,7 +1128,12 @@ func TestNoMetrics(t *testing.T) {
 		SaphanaVolumeOperationSize:              MetricSettings{Enabled: false},
 		SaphanaVolumeOperationTime:              MetricSettings{Enabled: false},
 	}
-	mb := NewMetricsBuilder(settings, component.BuildInfo{}, WithStartTime(start))
+	observedZapCore, observedLogs := observer.New(zap.WarnLevel)
+	settings := receivertest.NewNopCreateSettings()
+	settings.Logger = zap.New(observedZapCore)
+	mb := NewMetricsBuilder(metricsSettings, settings, WithStartTime(start))
+
+	assert.Equal(t, 0, observedLogs.Len())
 	mb.RecordSaphanaAlertCountDataPoint(ts, "1", "attr-val")
 	mb.RecordSaphanaBackupLatestDataPoint(ts, "1")
 	mb.RecordSaphanaColumnMemoryUsedDataPoint(ts, "1", AttributeColumnMemoryType(1), AttributeColumnMemorySubtype(1))

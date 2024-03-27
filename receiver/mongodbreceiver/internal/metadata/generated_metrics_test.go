@@ -7,15 +7,17 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/pmetric"
+	"go.opentelemetry.io/collector/receiver/receivertest"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest/observer"
 )
 
 func TestDefaultMetrics(t *testing.T) {
 	start := pcommon.Timestamp(1_000_000_000)
 	ts := pcommon.Timestamp(1_000_001_000)
-	mb := NewMetricsBuilder(DefaultMetricsSettings(), component.BuildInfo{}, WithStartTime(start))
+	mb := NewMetricsBuilder(DefaultMetricsSettings(), receivertest.NewNopCreateSettings(), WithStartTime(start))
 	enabledMetrics := make(map[string]bool)
 
 	enabledMetrics["mongodb.cache.operations"] = true
@@ -110,7 +112,7 @@ func TestDefaultMetrics(t *testing.T) {
 func TestAllMetrics(t *testing.T) {
 	start := pcommon.Timestamp(1_000_000_000)
 	ts := pcommon.Timestamp(1_000_001_000)
-	settings := MetricsSettings{
+	metricsSettings := MetricsSettings{
 		MongodbCacheOperations:        MetricSettings{Enabled: true},
 		MongodbCollectionCount:        MetricSettings{Enabled: true},
 		MongodbConnectionCount:        MetricSettings{Enabled: true},
@@ -138,7 +140,12 @@ func TestAllMetrics(t *testing.T) {
 		MongodbSessionCount:           MetricSettings{Enabled: true},
 		MongodbStorageSize:            MetricSettings{Enabled: true},
 	}
-	mb := NewMetricsBuilder(settings, component.BuildInfo{}, WithStartTime(start))
+	observedZapCore, observedLogs := observer.New(zap.WarnLevel)
+	settings := receivertest.NewNopCreateSettings()
+	settings.Logger = zap.New(observedZapCore)
+	mb := NewMetricsBuilder(metricsSettings, settings, WithStartTime(start))
+
+	assert.Equal(t, 0, observedLogs.Len())
 
 	mb.RecordMongodbCacheOperationsDataPoint(ts, 1, AttributeType(1))
 	mb.RecordMongodbCollectionCountDataPoint(ts, 1, "attr-val")
@@ -199,7 +206,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, int64(1), dp.IntValue())
 			attrVal, ok := dp.Attributes().Get("type")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeType(1).String(), attrVal.Str())
+			assert.Equal(t, "hit", attrVal.Str())
 			validatedMetrics["mongodb.cache.operations"] = struct{}{}
 		case "mongodb.collection.count":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -234,7 +241,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.EqualValues(t, "attr-val", attrVal.Str())
 			attrVal, ok = dp.Attributes().Get("type")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeConnectionType(1).String(), attrVal.Str())
+			assert.Equal(t, "active", attrVal.Str())
 			validatedMetrics["mongodb.connection.count"] = struct{}{}
 		case "mongodb.cursor.count":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -308,7 +315,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.EqualValues(t, "attr-val", attrVal.Str())
 			attrVal, ok = dp.Attributes().Get("operation")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeOperation(1).String(), attrVal.Str())
+			assert.Equal(t, "insert", attrVal.Str())
 			validatedMetrics["mongodb.document.operation.count"] = struct{}{}
 		case "mongodb.extent.count":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -407,10 +414,10 @@ func TestAllMetrics(t *testing.T) {
 			assert.EqualValues(t, "attr-val", attrVal.Str())
 			attrVal, ok = dp.Attributes().Get("lock_type")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeLockType(1).String(), attrVal.Str())
+			assert.Equal(t, "parallel_batch_write_mode", attrVal.Str())
 			attrVal, ok = dp.Attributes().Get("lock_mode")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeLockMode(1).String(), attrVal.Str())
+			assert.Equal(t, "shared", attrVal.Str())
 			validatedMetrics["mongodb.lock.acquire.count"] = struct{}{}
 		case "mongodb.lock.acquire.time":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -429,10 +436,10 @@ func TestAllMetrics(t *testing.T) {
 			assert.EqualValues(t, "attr-val", attrVal.Str())
 			attrVal, ok = dp.Attributes().Get("lock_type")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeLockType(1).String(), attrVal.Str())
+			assert.Equal(t, "parallel_batch_write_mode", attrVal.Str())
 			attrVal, ok = dp.Attributes().Get("lock_mode")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeLockMode(1).String(), attrVal.Str())
+			assert.Equal(t, "shared", attrVal.Str())
 			validatedMetrics["mongodb.lock.acquire.time"] = struct{}{}
 		case "mongodb.lock.acquire.wait_count":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -451,10 +458,10 @@ func TestAllMetrics(t *testing.T) {
 			assert.EqualValues(t, "attr-val", attrVal.Str())
 			attrVal, ok = dp.Attributes().Get("lock_type")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeLockType(1).String(), attrVal.Str())
+			assert.Equal(t, "parallel_batch_write_mode", attrVal.Str())
 			attrVal, ok = dp.Attributes().Get("lock_mode")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeLockMode(1).String(), attrVal.Str())
+			assert.Equal(t, "shared", attrVal.Str())
 			validatedMetrics["mongodb.lock.acquire.wait_count"] = struct{}{}
 		case "mongodb.lock.deadlock.count":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -473,10 +480,10 @@ func TestAllMetrics(t *testing.T) {
 			assert.EqualValues(t, "attr-val", attrVal.Str())
 			attrVal, ok = dp.Attributes().Get("lock_type")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeLockType(1).String(), attrVal.Str())
+			assert.Equal(t, "parallel_batch_write_mode", attrVal.Str())
 			attrVal, ok = dp.Attributes().Get("lock_mode")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeLockMode(1).String(), attrVal.Str())
+			assert.Equal(t, "shared", attrVal.Str())
 			validatedMetrics["mongodb.lock.deadlock.count"] = struct{}{}
 		case "mongodb.memory.usage":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -495,7 +502,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.EqualValues(t, "attr-val", attrVal.Str())
 			attrVal, ok = dp.Attributes().Get("type")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeMemoryType(1).String(), attrVal.Str())
+			assert.Equal(t, "resident", attrVal.Str())
 			validatedMetrics["mongodb.memory.usage"] = struct{}{}
 		case "mongodb.network.io.receive":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -566,7 +573,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, int64(1), dp.IntValue())
 			attrVal, ok := dp.Attributes().Get("operation")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeOperation(1).String(), attrVal.Str())
+			assert.Equal(t, "insert", attrVal.Str())
 			validatedMetrics["mongodb.operation.count"] = struct{}{}
 		case "mongodb.operation.time":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -582,7 +589,7 @@ func TestAllMetrics(t *testing.T) {
 			assert.Equal(t, int64(1), dp.IntValue())
 			attrVal, ok := dp.Attributes().Get("operation")
 			assert.True(t, ok)
-			assert.Equal(t, AttributeOperation(1).String(), attrVal.Str())
+			assert.Equal(t, "insert", attrVal.Str())
 			validatedMetrics["mongodb.operation.time"] = struct{}{}
 		case "mongodb.session.count":
 			assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
@@ -621,7 +628,7 @@ func TestAllMetrics(t *testing.T) {
 func TestNoMetrics(t *testing.T) {
 	start := pcommon.Timestamp(1_000_000_000)
 	ts := pcommon.Timestamp(1_000_001_000)
-	settings := MetricsSettings{
+	metricsSettings := MetricsSettings{
 		MongodbCacheOperations:        MetricSettings{Enabled: false},
 		MongodbCollectionCount:        MetricSettings{Enabled: false},
 		MongodbConnectionCount:        MetricSettings{Enabled: false},
@@ -649,7 +656,12 @@ func TestNoMetrics(t *testing.T) {
 		MongodbSessionCount:           MetricSettings{Enabled: false},
 		MongodbStorageSize:            MetricSettings{Enabled: false},
 	}
-	mb := NewMetricsBuilder(settings, component.BuildInfo{}, WithStartTime(start))
+	observedZapCore, observedLogs := observer.New(zap.WarnLevel)
+	settings := receivertest.NewNopCreateSettings()
+	settings.Logger = zap.New(observedZapCore)
+	mb := NewMetricsBuilder(metricsSettings, settings, WithStartTime(start))
+
+	assert.Equal(t, 0, observedLogs.Len())
 	mb.RecordMongodbCacheOperationsDataPoint(ts, 1, AttributeType(1))
 	mb.RecordMongodbCollectionCountDataPoint(ts, 1, "attr-val")
 	mb.RecordMongodbConnectionCountDataPoint(ts, 1, "attr-val", AttributeConnectionType(1))

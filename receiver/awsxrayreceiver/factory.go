@@ -21,6 +21,7 @@ import (
 	"go.opentelemetry.io/collector/config"
 	"go.opentelemetry.io/collector/config/confignet"
 	"go.opentelemetry.io/collector/consumer"
+	"go.opentelemetry.io/collector/receiver"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/internal/aws/proxy"
 	awsxray "github.com/open-telemetry/opentelemetry-collector-contrib/internal/aws/xray"
@@ -28,14 +29,14 @@ import (
 )
 
 // NewFactory creates a factory for AWS receiver.
-func NewFactory() component.ReceiverFactory {
-	return component.NewReceiverFactory(
+func NewFactory() receiver.Factory {
+	return receiver.NewFactory(
 		awsxray.TypeStr,
 		createDefaultConfig,
-		component.WithTracesReceiver(createTracesReceiver, component.StabilityLevelBeta))
+		receiver.WithTraces(createTracesReceiver, component.StabilityLevelBeta))
 }
 
-func createDefaultConfig() component.ReceiverConfig {
+func createDefaultConfig() component.Config {
 	// reference the existing default configurations provided
 	// in the X-Ray daemon:
 	// https://github.com/aws/aws-xray-daemon/blob/master/pkg/cfg/cfg.go#L99
@@ -53,9 +54,9 @@ func createDefaultConfig() component.ReceiverConfig {
 
 func createTracesReceiver(
 	ctx context.Context,
-	params component.ReceiverCreateSettings,
-	cfg component.ReceiverConfig,
-	consumer consumer.Traces) (component.TracesReceiver, error) {
+	params receiver.CreateSettings,
+	cfg component.Config,
+	consumer consumer.Traces) (receiver.Traces, error) {
 	rcfg := cfg.(*Config)
 	return newReceiver(rcfg, consumer, params)
 }

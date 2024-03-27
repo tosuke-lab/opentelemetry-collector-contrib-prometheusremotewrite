@@ -24,10 +24,12 @@ import (
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/pmetric"
+	"go.opentelemetry.io/collector/receiver"
 	"go.opentelemetry.io/collector/receiver/scrapererror"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/internal/filter/filterset"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver/internal/scraper/processscraper/internal/metadata"
+	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver/internal/scraper/processscraper/ucal"
 )
 
 const (
@@ -45,25 +47,27 @@ const (
 
 // scraper for Process Metrics
 type scraper struct {
-	settings           component.ReceiverCreateSettings
+	settings           receiver.CreateSettings
 	config             *Config
 	mb                 *metadata.MetricsBuilder
 	includeFS          filterset.FilterSet
 	excludeFS          filterset.FilterSet
 	scrapeProcessDelay time.Duration
+	ucal               *ucal.CPUUtilizationCalculator
 	// for mocking
 	getProcessCreateTime func(p processHandle) (int64, error)
 	getProcessHandles    func() (processHandles, error)
 }
 
 // newProcessScraper creates a Process Scraper
-func newProcessScraper(settings component.ReceiverCreateSettings, cfg *Config) (*scraper, error) {
+func newProcessScraper(settings receiver.CreateSettings, cfg *Config) (*scraper, error) {
 	scraper := &scraper{
 		settings:             settings,
 		config:               cfg,
 		getProcessCreateTime: processHandle.CreateTime,
 		getProcessHandles:    getProcessHandlesInternal,
 		scrapeProcessDelay:   cfg.ScrapeProcessDelay,
+		ucal:                 &ucal.CPUUtilizationCalculator{},
 	}
 
 	var err error
@@ -86,7 +90,7 @@ func newProcessScraper(settings component.ReceiverCreateSettings, cfg *Config) (
 }
 
 func (s *scraper) start(context.Context, component.Host) error {
-	s.mb = metadata.NewMetricsBuilder(s.config.Metrics, s.settings.BuildInfo)
+	s.mb = metadata.NewMetricsBuilder(s.config.Metrics, s.settings)
 	return nil
 }
 
@@ -228,7 +232,9 @@ func (s *scraper) scrapeAndAppendCPUTimeMetric(now pcommon.Timestamp, handle pro
 	}
 
 	s.recordCPUTimeMetric(now, times)
-	return nil
+
+	err = s.ucal.CalculateAndRecord(now, times, s.recordCPUUtilization)
+	return err
 }
 
 func (s *scraper) scrapeAndAppendMemoryUsageMetrics(now pcommon.Timestamp, handle processHandle) error {
