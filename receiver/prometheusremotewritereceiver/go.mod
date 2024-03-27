@@ -9,7 +9,7 @@ require (
 	github.com/prometheus/prometheus v0.38.0
 	github.com/stretchr/testify v1.8.1
 	go.opentelemetry.io/collector v0.64.2-0.20221110222631-20e3aac00413
-	go.opentelemetry.io/collector/pdata v0.65.0
+	go.opentelemetry.io/collector/pdata v0.66.0
 	go.uber.org/zap v1.23.0
 )
 
@@ -40,7 +40,7 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/mwitkow/go-conntrack v0.0.0-20190716064945-2f068394615f // indirect
-	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/prometheus v0.64.0 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/prometheus v0.66.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_golang v1.13.1 // indirect
@@ -50,7 +50,7 @@ require (
 	github.com/prometheus/procfs v0.8.0 // indirect
 	github.com/rs/cors v1.8.2 // indirect
 	go.opencensus.io v0.24.0 // indirect
-	go.opentelemetry.io/collector/semconv v0.65.0 // indirect
+	go.opentelemetry.io/collector/semconv v0.66.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.36.4 // indirect
 	go.opentelemetry.io/otel v1.11.1 // indirect
 	go.opentelemetry.io/otel/metric v0.33.0 // indirect
