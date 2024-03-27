@@ -41,7 +41,7 @@ import (
 	"go.opentelemetry.io/collector/receiver/scraperhelper"
 	"go.uber.org/zap/zaptest"
 
-	"github.com/open-telemetry/opentelemetry-collector-contrib/internal/comparetest"
+	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/pdatatest/plogtest"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/mongodbatlasreceiver/internal"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/mongodbatlasreceiver/internal/model"
 )
@@ -179,7 +179,7 @@ func TestPayloadToLogRecord(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 				require.NotNil(t, logs)
-				require.NoError(t, comparetest.CompareLogs(tc.expectedLogs(tc.payload), logs))
+				require.NoError(t, plogtest.CompareLogs(tc.expectedLogs(tc.payload), logs))
 			}
 		})
 	}
@@ -435,6 +435,8 @@ func TestHandleRequest(t *testing.T) {
 const (
 	testAlertID         = "633335c99998645b1803c60b"
 	testGroupID         = "5bc762b579358e3332046e6a"
+	testAlertConfigID   = "REDACTED-alert"
+	testOrgID           = "test-org-id"
 	testProjectID       = "test-project-id"
 	testProjectName     = "test-project"
 	testMetricName      = "metric-name"
@@ -482,6 +484,18 @@ func TestAlertsRetrieval(t *testing.T) {
 					"type_name":    testTypeName,
 				}
 				validateAttributes(t, expectedStringAttributes, logs)
+				expectedResourceAttributes := map[string]string{
+					"mongodbatlas.group.id":        testGroupID,
+					"mongodbatlas.alert.config.id": testAlertConfigID,
+					"mongodbatlas.project.name":    testProjectName,
+					"mongodbatlas.org.id":          testOrgID,
+				}
+				ra := logs.ResourceLogs().At(0).Resource().Attributes()
+				for k, v := range expectedResourceAttributes {
+					value, ok := ra.Get(k)
+					require.True(t, ok)
+					require.Equal(t, v, value)
+				}
 			},
 		},
 		{
@@ -536,7 +550,7 @@ func TestAlertsRetrieval(t *testing.T) {
 				tc := &mockAlertsClient{}
 				tc.On("GetProject", mock.Anything, mock.Anything).Return(&mongodbatlas.Project{
 					ID:    testProjectID,
-					OrgID: "test-org-id",
+					OrgID: testOrgID,
 					Name:  testProjectName,
 					Links: []*mongodbatlas.Link{},
 				}, nil)
@@ -635,7 +649,7 @@ func testClient() *mockAlertsClient {
 	ac := &mockAlertsClient{}
 	ac.On("GetProject", mock.Anything, mock.Anything).Return(&mongodbatlas.Project{
 		ID:    testProjectID,
-		OrgID: "test-org-id",
+		OrgID: testOrgID,
 		Name:  testProjectName,
 		Links: []*mongodbatlas.Link{},
 	}, nil)
