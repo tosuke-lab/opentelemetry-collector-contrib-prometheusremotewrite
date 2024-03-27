@@ -15,16 +15,19 @@
 package prometheusremotewritereceiver // import "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusremotewritereceiver"
 
 import (
-	"go.opentelemetry.io/collector/config"
-    "go.opentelemetry.io/collector/component"
+	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/config/confighttp"
 )
 
 // Config - remote write
 type Config struct {
-	config.ReceiverSettings       `mapstructure:",squash"`
 	confighttp.HTTPServerSettings `mapstructure:",squash"`
 	TimeThreshold                 int64 `mapstructure:"time_threshold"`
 }
 
-var _ component.ReceiverConfig = (*Config)(nil)
+func (c *Config) Validate() error {
+    return nil
+}
+
+var _ component.Config = (*Config)(nil)
+var _ component.ConfigValidator = (*Config)(nil)

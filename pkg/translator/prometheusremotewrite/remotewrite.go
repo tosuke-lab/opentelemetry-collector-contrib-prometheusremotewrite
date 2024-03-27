@@ -8,4 +8,5 @@ type Settings struct {
 	DisableTargetInfo bool
 	TimeThreshold     int64
 	Logger            zap.Logger
+	ExportCreatedMetric bool
 }

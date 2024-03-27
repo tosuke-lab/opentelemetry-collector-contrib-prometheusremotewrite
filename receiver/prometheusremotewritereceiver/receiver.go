@@ -26,6 +26,7 @@ import (
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/consumer"
 	"go.opentelemetry.io/collector/obsreport"
+	"go.opentelemetry.io/collector/receiver"
 	"go.uber.org/zap"
 )
 
@@ -37,7 +38,7 @@ const (
 
 // PrometheusRemoteWriteReceiver - remote write
 type PrometheusRemoteWriteReceiver struct {
-	params       component.ReceiverCreateSettings
+	params       receiver.CreateSettings
 	host         component.Host
 	nextConsumer consumer.Metrics
 
@@ -54,16 +55,16 @@ type PrometheusRemoteWriteReceiver struct {
 }
 
 // NewReceiver - remote write
-func NewReceiver(params component.ReceiverCreateSettings, config *Config, consumer consumer.Metrics) (*PrometheusRemoteWriteReceiver, error) {
+func NewReceiver(settings receiver.CreateSettings, config *Config, consumer consumer.Metrics) (*PrometheusRemoteWriteReceiver, error) {
 	obsrecv, err := obsreport.NewReceiver(obsreport.ReceiverSettings{
-		ReceiverID:             config.ID(),
-		ReceiverCreateSettings: params,
+		ReceiverID:             settings.ID,
+		ReceiverCreateSettings: settings,
 	})
 	zr := &PrometheusRemoteWriteReceiver{
-		params:        params,
+		params:        settings,
 		nextConsumer:  consumer,
 		config:        config,
-		logger:        params.Logger,
+		logger:        settings.Logger,
 		obsrecv:       obsrecv,
 		timeThreshold: &config.TimeThreshold,
 	}

@@ -29,6 +29,7 @@ import (
 	"go.opentelemetry.io/collector/component/componenttest"
 	"go.opentelemetry.io/collector/consumer/consumertest"
 	"go.opentelemetry.io/collector/pdata/pmetric"
+	"go.opentelemetry.io/collector/receiver/receivertest"
 )
 
 var url = "http://localhost:19291"
@@ -110,7 +111,7 @@ func TestPrometheusRemoteWriteReceiver(t *testing.T) {
 	config := createDefaultConfig().(*Config)
 
 	receiver, _ := NewReceiver(
-		componenttest.NewNopReceiverCreateSettings(),
+		receivertest.NewNopCreateSettings(),
 		config,
 		cms)
 
