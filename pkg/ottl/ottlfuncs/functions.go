@@ -50,6 +50,7 @@ func converters[K any]() []ottl.Factory[K] {
 		NewMillisecondsFactory[K](),
 		NewMinutesFactory[K](),
 		NewNanosecondsFactory[K](),
+		NewNowFactory[K](),
 		NewParseJSONFactory[K](),
 		NewSecondsFactory[K](),
 		NewSHA1Factory[K](),
@@ -58,7 +59,12 @@ func converters[K any]() []ottl.Factory[K] {
 		NewSplitFactory[K](),
 		NewSubstringFactory[K](),
 		NewTimeFactory[K](),
+		NewTruncateTimeFactory[K](),
 		NewTraceIDFactory[K](),
+		NewUnixMicroFactory[K](),
+		NewUnixMilliFactory[K](),
+		NewUnixNanoFactory[K](),
+		NewUnixSecondsFactory[K](),
 		NewUUIDFactory[K](),
 	}
 }
