@@ -50,7 +50,6 @@ func MakeRequest(ctx context.Context, url string, writeRequest *prompb.WriteRequ
 		return code, err
 	}
 	req.Header.Set("Content-Type", "application/x-protobuf")
-	req.Header.Set("Content-Encoding", "snappy")
 
 	httpClient := http.Client{
 		Timeout: 10 * time.Second,
