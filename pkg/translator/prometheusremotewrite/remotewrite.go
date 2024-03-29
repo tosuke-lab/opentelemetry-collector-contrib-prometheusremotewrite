@@ -9,4 +9,5 @@ type Settings struct {
 	TimeThreshold     int64
 	Logger            zap.Logger
 	ExportCreatedMetric bool
+	AddMetricSuffixes   bool
 }
