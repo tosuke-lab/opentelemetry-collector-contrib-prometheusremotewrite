@@ -31,10 +31,22 @@ Aggregates Request, Error and Duration (R.E.D) OpenTelemetry metrics from span d
 dimensions, including Errors. Multiple metrics can be aggregated if, for instance,
 a user wishes to view call counts just on `service.name` and `span.name`.
 
+```
+calls{service.name="shipping",span.name="get_shipping/{shippingId}",span.kind="SERVER",status.code="Ok"}
+```
+
 **Error** counts are computed from the Request counts which have an `Error` Status Code metric dimension.
+
+```
+calls{service.name="shipping",span.name="get_shipping/{shippingId},span.kind="SERVER",status.code="Error"}
+```
 
 **Duration** is computed from the difference between the span start and end times and inserted into the
 relevant duration histogram time bucket for each unique set dimensions.
+
+```
+duration{service.name="shipping",span.name="get_shipping/{shippingId}",span.kind="SERVER",status.code="Ok"}
+```
 
 Each metric will have _at least_ the following dimensions because they are common
 across all spans:
@@ -102,6 +114,9 @@ The following settings can be optionally configured:
 - `metrics_flush_interval` (default: `15s`): Defines the flush interval of the generated metrics.
 - `exemplars`:  Use to configure how to attach exemplars to histograms
   - `enabled` (default: `false`): enabling will add spans as Exemplars.
+- `events`: Use to configure the events metric.
+  - `enabled`: (default: `false`): enabling will add the events metric.
+  - `dimensions`: (mandatory if `enabled`) the list of the span's event attributes to add as dimensions to the events metric, which will be included _on top of_ the common and configured `dimensions` for span and resource attributes.
 
 ## Examples
 
@@ -132,7 +147,12 @@ connectors:
     exclude_dimensions: ['status.code']
     dimensions_cache_size: 1000
     aggregation_temporality: "AGGREGATION_TEMPORALITY_CUMULATIVE"    
-    metrics_flush_interval: 15s 
+    metrics_flush_interval: 15s
+    events:
+      enabled: true
+      dimensions:
+        - name: exception.type
+        - name: exception.message
 
 service:
   pipelines:

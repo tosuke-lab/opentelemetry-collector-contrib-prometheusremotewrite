@@ -88,6 +88,10 @@ stability-tests: otelcontribcol
 	@echo Stability tests are disabled until we have a stable performance environment.
 	@echo To enable the tests replace this echo by $(MAKE) -C testbed run-stability-tests
 
+.PHONY: gogci
+gogci:
+	$(MAKE) $(FOR_GROUP_TARGET) TARGET="gci"
+
 .PHONY: gotidy
 gotidy:
 	$(MAKE) $(FOR_GROUP_TARGET) TARGET="tidy"
@@ -135,19 +139,12 @@ COMMIT?=HEAD
 MODSET?=contrib-core
 REMOTE?=git@github.com:open-telemetry/opentelemetry-collector-contrib.git
 .PHONY: push-tags
-push-tags: $(MULITMOD)
-	$(MULITMOD) verify
-	set -e; for tag in `$(MULITMOD) tag -m ${MODSET} -c ${COMMIT} --print-tags | grep -v "Using" `; do \
+push-tags: $(MULTIMOD)
+	$(MULTIMOD) verify
+	set -e; for tag in `$(MULTIMOD) tag -m ${MODSET} -c ${COMMIT} --print-tags | grep -v "Using" `; do \
 		echo "pushing tag $${tag}"; \
 		git push ${REMOTE} $${tag}; \
 	done;
-
-DEPENDABOT_PATH=".github/dependabot.yml"
-.PHONY: gendependabot
-gendependabot:
-	cd cmd/githubgen && $(GOCMD) install .
-	githubgen -dependabot
-
 
 # Define a delegation target for each module
 .PHONY: $(ALL_MODS)
@@ -226,7 +223,7 @@ docker-telemetrygen:
 	COMPONENT=telemetrygen $(MAKE) docker-component
 
 .PHONY: generate
-generate:
+generate: install-tools
 	cd cmd/mdatagen && $(GOCMD) install .
 	$(MAKE) for-all CMD="$(GOCMD) generate ./..."
 
@@ -367,18 +364,18 @@ certs:
 	$(foreach dir, $(CERT_DIRS), $(call exec-command, @internal/buildscripts/gen-certs.sh -o $(dir)))
 
 .PHONY: multimod-verify
-multimod-verify: $(MULITMOD)
+multimod-verify: $(MULTIMOD)
 	@echo "Validating versions.yaml"
-	$(MULITMOD) verify
+	$(MULTIMOD) verify
 
 .PHONY: multimod-prerelease
-multimod-prerelease: $(MULITMOD)
-	$(MULITMOD) prerelease -s=true -b=false -v ./versions.yaml -m contrib-base
+multimod-prerelease: $(MULTIMOD)
+	$(MULTIMOD) prerelease -s=true -b=false -v ./versions.yaml -m contrib-base
 	$(MAKE) gotidy
 
 .PHONY: multimod-sync
-multimod-sync: $(MULITMOD)
-	$(MULITMOD) sync -a=true -s=true -o ../opentelemetry-collector
+multimod-sync: $(MULTIMOD)
+	$(MULTIMOD) sync -a=true -s=true -o ../opentelemetry-collector
 	$(MAKE) gotidy
 
 .PHONY: crosslink
@@ -401,10 +398,5 @@ genconfigdocs:
 
 .PHONY: generate-gh-issue-templates
 generate-gh-issue-templates:
-	for FILE in bug_report feature_request other; do \
-		YAML_FILE=".github/ISSUE_TEMPLATE/$${FILE}.yaml"; \
-		TMP_FILE=".github/ISSUE_TEMPLATE/$${FILE}.yaml.tmp"; \
-		cat "$${YAML_FILE}" > "$${TMP_FILE}"; \
-	 	FILE="$${TMP_FILE}" ./.github/workflows/scripts/add-component-options.sh > "$${YAML_FILE}"; \
-		rm "$${TMP_FILE}"; \
-	done
+	cd cmd/githubgen && $(GOCMD) install .
+	githubgen issue-templates

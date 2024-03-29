@@ -10,4 +10,5 @@ type Settings struct {
 	Logger            zap.Logger
 	ExportCreatedMetric bool
 	AddMetricSuffixes   bool
+	SendMetadata        bool
 }
