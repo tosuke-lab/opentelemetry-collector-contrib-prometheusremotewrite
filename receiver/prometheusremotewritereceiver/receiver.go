@@ -21,7 +21,8 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/prometheusremotewrite"
+	// "github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/prometheusremotewrite"
+	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusremotewritereceiver/translator/prometheusremotewrite"
 	"github.com/prometheus/prometheus/storage/remote"
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/consumer"
@@ -34,11 +35,13 @@ const (
 	receiverFormat = "protobuf"
 )
 
+var errNilNextConsumer = errors.New("nil next consumer")
+
 //var reg = regexp.MustCompile(`(\w+)_(\w+)_(\w+)\z`)
 
 // PrometheusRemoteWriteReceiver - remote write
 type PrometheusRemoteWriteReceiver struct {
-	params       receiver.CreateSettings
+	settings     receiver.CreateSettings
 	host         component.Host
 	nextConsumer consumer.Metrics
 
@@ -61,7 +64,7 @@ func NewReceiver(settings receiver.CreateSettings, config *Config, consumer cons
 		ReceiverCreateSettings: settings,
 	})
 	zr := &PrometheusRemoteWriteReceiver{
-		params:        settings,
+		settings:      settings,
 		nextConsumer:  consumer,
 		config:        config,
 		logger:        settings.Logger,
@@ -78,13 +81,13 @@ func (rec *PrometheusRemoteWriteReceiver) Start(_ context.Context, host componen
 	}
 	rec.mu.Lock()
 	defer rec.mu.Unlock()
-	var err = component.ErrNilNextConsumer
+	var err = errNilNextConsumer
 	rec.startOnce.Do(func() {
 		err = nil
 		rec.host = host
-		rec.server, err = rec.config.HTTPServerSettings.ToServer(host, rec.params.TelemetrySettings, rec)
+		rec.server, err = rec.config.ServerConfig.ToServer(host, rec.settings.TelemetrySettings, rec)
 		var listener net.Listener
-		listener, err = rec.config.HTTPServerSettings.ToListener()
+		listener, err = rec.config.ServerConfig.ToListener()
 		if err != nil {
 			return
 		}
@@ -92,7 +95,7 @@ func (rec *PrometheusRemoteWriteReceiver) Start(_ context.Context, host componen
 		go func() {
 			defer rec.shutdownWG.Done()
 			if errHTTP := rec.server.Serve(listener); errHTTP != http.ErrServerClosed {
-				host.ReportFatalError(errHTTP)
+				rec.settings.ReportStatus(component.NewFatalErrorEvent(errHTTP))
 			}
 		}()
 	})
@@ -128,7 +131,7 @@ func (rec *PrometheusRemoteWriteReceiver) ServeHTTP(w http.ResponseWriter, r *ht
 
 // Shutdown - remote write
 func (rec *PrometheusRemoteWriteReceiver) Shutdown(context.Context) error {
-	var err = component.ErrNilNextConsumer
+	var err = errNilNextConsumer
 	rec.stopOnce.Do(func() {
 		err = rec.server.Close()
 		rec.shutdownWG.Wait()

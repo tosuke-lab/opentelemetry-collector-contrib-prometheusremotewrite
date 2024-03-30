@@ -30,17 +30,19 @@ const (
 	defaultTimeThreshold = 24
 )
 
+var componentType = component.MustNewType(typeStr)
+
 // NewFactory - remote write
 func NewFactory() receiver.Factory {
 	return receiver.NewFactory(
-		typeStr,
+		componentType,
 		createDefaultConfig,
 		receiver.WithMetrics(createMetricsReceiver, stability))
 }
 
 func createDefaultConfig() component.Config {
 	return &Config{
-		HTTPServerSettings: confighttp.HTTPServerSettings{
+		ServerConfig: confighttp.ServerConfig{
 			Endpoint: defaultBindEndpoint,
 		},
 		TimeThreshold: defaultTimeThreshold,

@@ -34,7 +34,7 @@ func TestCreateDefaultConfig(t *testing.T) {
 	assert.Equal(t, ocfg.RetrySettings, configretry.NewDefaultBackOffConfig())
 	assert.Equal(t, ocfg.QueueSettings, exporterhelper.NewDefaultQueueSettings())
 	assert.Equal(t, ocfg.TimeoutSettings, exporterhelper.NewDefaultTimeoutSettings())
-	assert.Equal(t, ocfg.Compression, configcompression.Zstd)
+	assert.Equal(t, ocfg.Compression, configcompression.TypeZstd)
 	assert.Equal(t, ocfg.Arrow, ArrowSettings{
 		Disabled:           false,
 		NumStreams:         runtime.NumCPU(),
@@ -77,7 +77,7 @@ func TestCreateTracesExporter(t *testing.T) {
 			config: Config{
 				ClientConfig: configgrpc.ClientConfig{
 					Endpoint: endpoint,
-					TLSSetting: configtls.TLSClientSetting{
+					TLSSetting: configtls.ClientConfig{
 						Insecure: false,
 					},
 				},
@@ -110,7 +110,7 @@ func TestCreateTracesExporter(t *testing.T) {
 			config: Config{
 				ClientConfig: configgrpc.ClientConfig{
 					Endpoint:    endpoint,
-					Compression: configcompression.Gzip,
+					Compression: configcompression.TypeGzip,
 				},
 			},
 		},
@@ -119,7 +119,7 @@ func TestCreateTracesExporter(t *testing.T) {
 			config: Config{
 				ClientConfig: configgrpc.ClientConfig{
 					Endpoint:    endpoint,
-					Compression: configcompression.Snappy,
+					Compression: configcompression.TypeSnappy,
 				},
 			},
 		},
@@ -128,7 +128,7 @@ func TestCreateTracesExporter(t *testing.T) {
 			config: Config{
 				ClientConfig: configgrpc.ClientConfig{
 					Endpoint:    endpoint,
-					Compression: configcompression.Zstd,
+					Compression: configcompression.TypeZstd,
 				},
 			},
 		},
@@ -157,8 +157,8 @@ func TestCreateTracesExporter(t *testing.T) {
 			config: Config{
 				ClientConfig: configgrpc.ClientConfig{
 					Endpoint: endpoint,
-					TLSSetting: configtls.TLSClientSetting{
-						TLSSetting: configtls.TLSSetting{
+					TLSSetting: configtls.ClientConfig{
+						TLSSetting: configtls.Config{
 							CAFile: filepath.Join("testdata", "test_cert.pem"),
 						},
 					},
@@ -170,8 +170,8 @@ func TestCreateTracesExporter(t *testing.T) {
 			config: Config{
 				ClientConfig: configgrpc.ClientConfig{
 					Endpoint: endpoint,
-					TLSSetting: configtls.TLSClientSetting{
-						TLSSetting: configtls.TLSSetting{
+					TLSSetting: configtls.ClientConfig{
+						TLSSetting: configtls.Config{
 							CAFile: "nosuchfile",
 						},
 					},

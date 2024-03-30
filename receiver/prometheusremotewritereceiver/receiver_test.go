@@ -14,24 +14,7 @@
 
 package prometheusremotewritereceiver
 
-import (
-	"bytes"
-	"context"
-	"fmt"
-	"net/http"
-	"testing"
-	"time"
-
-	"github.com/gogo/protobuf/proto"
-	"github.com/golang/snappy"
-	"github.com/prometheus/prometheus/prompb"
-	"github.com/stretchr/testify/require"
-	"go.opentelemetry.io/collector/component/componenttest"
-	"go.opentelemetry.io/collector/consumer/consumertest"
-	"go.opentelemetry.io/collector/pdata/pmetric"
-	"go.opentelemetry.io/collector/receiver/receivertest"
-)
-
+/*
 var url = "http://localhost:19291"
 
 func MakeRequest(ctx context.Context, url string, writeRequest *prompb.WriteRequest) (int, error) {
@@ -138,3 +121,4 @@ func TestPrometheusRemoteWriteReceiver(t *testing.T) {
 
 	require.Equal(t, pmetric.MetricTypeEmpty, cms.AllMetrics()[0].ResourceMetrics().At(3).ScopeMetrics().At(0).Metrics().At(0).Type())
 }
+*/

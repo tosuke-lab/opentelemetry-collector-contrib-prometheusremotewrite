@@ -36,16 +36,16 @@ func TestLoadConfig(t *testing.T) {
 		expected component.Config
 	}{
 		{
-			id:       component.NewIDWithName(typeStr, "defaults"),
+			id:       component.NewIDWithName(componentType, "defaults"),
 			expected: createDefaultConfig(),
 		},
 		{
-			id: component.NewIDWithName(typeStr, ""),
+			id: component.NewIDWithName(componentType, ""),
 			expected: &Config{
-				HTTPServerSettings: confighttp.HTTPServerSettings{
+				ServerConfig: confighttp.ServerConfig{
 					Endpoint:           "0.0.0.0:19291",
 					TLSSetting:         (*configtls.TLSServerSetting)(nil),
-					CORS:               (*confighttp.CORSSettings)(nil),
+					CORS:               (*confighttp.CORSConfig)(nil),
 					Auth:               (*configauth.Authentication)(nil),
 					MaxRequestBodySize: 0,
 					IncludeMetadata:    false},

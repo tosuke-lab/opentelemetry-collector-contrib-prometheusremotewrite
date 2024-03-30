@@ -21,12 +21,12 @@ import (
 
 // Config - remote write
 type Config struct {
-	confighttp.HTTPServerSettings `mapstructure:",squash"`
-	TimeThreshold                 int64 `mapstructure:"time_threshold"`
+	confighttp.ServerConfig `mapstructure:",squash"`
+	TimeThreshold           int64 `mapstructure:"time_threshold"`
 }
 
 func (c *Config) Validate() error {
-    return nil
+	return nil
 }
 
 var _ component.Config = (*Config)(nil)

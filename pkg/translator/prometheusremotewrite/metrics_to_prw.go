@@ -15,6 +15,16 @@ import (
 	prometheustranslator "github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/prometheus"
 )
 
+/* type Settings struct {
+	Namespace           string
+	ExternalLabels      map[string]string
+	DisableTargetInfo   bool
+	ExportCreatedMetric bool
+	AddMetricSuffixes   bool
+	SendMetadata        bool
+} */
+
+// FromMetrics converts pmetric.Metrics to Prometheus remote write format.
 func FromMetrics(md pmetric.Metrics, settings Settings) (tsMap map[string]*prompb.TimeSeries, errs error) {
 	tsMap = make(map[string]*prompb.TimeSeries)
 
